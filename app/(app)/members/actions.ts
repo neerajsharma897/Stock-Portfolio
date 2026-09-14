@@ -120,7 +120,14 @@ export async function deleteMember(memberId: string): Promise<FormState> {
     .select("name")
     .maybeSingle()
 
-  if (error) return actionError(`Couldn't delete: ${error.message}`)
+  if (error) {
+    if (error.code === FOREIGN_KEY_VIOLATION) {
+      return actionError(
+        "This member has transactions, so they can't be deleted. Delete the transactions first, or keep the member archived.",
+      )
+    }
+    return actionError(`Couldn't delete: ${error.message}`)
+  }
   if (!data) {
     return actionError("Only archived members can be deleted. Archive first.")
   }
@@ -207,7 +214,14 @@ export async function deleteBrokerAccount(
     .select("broker")
     .maybeSingle()
 
-  if (error) return actionError(`Couldn't delete: ${error.message}`)
+  if (error) {
+    if (error.code === FOREIGN_KEY_VIOLATION) {
+      return actionError(
+        "This account has transactions, so it can't be deleted. Delete those transactions or move them to another account first.",
+      )
+    }
+    return actionError(`Couldn't delete: ${error.message}`)
+  }
   if (!data) return actionError("This account no longer exists.")
 
   refresh()

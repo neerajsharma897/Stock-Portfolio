@@ -5,9 +5,10 @@ import { notFound } from "next/navigation"
 
 import { BrokerAccountDialog } from "@/app/(app)/members/[id]/broker-account-dialog"
 import { DeleteAccountButton } from "@/app/(app)/members/[id]/delete-account-button"
+import { HoldingsCard } from "@/app/(app)/members/[id]/holdings-card"
 import { MemberStatusActions } from "@/app/(app)/members/[id]/member-status-actions"
+import { TransactionsCard } from "@/app/(app)/members/[id]/transactions-card"
 import { MemberFormDialog } from "@/app/(app)/members/member-form-dialog"
-import { ComingSoon } from "@/components/coming-soon"
 import { MemberAvatar } from "@/components/member-avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -19,7 +20,12 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getMember } from "@/lib/data/members"
+import {
+  listMemberTransactions,
+  toHoldingTransaction,
+} from "@/lib/data/transactions"
 import { BROKER_LABELS, RELATION_LABELS } from "@/lib/members/options"
+import { groupHoldings } from "@/lib/portfolio/member-holdings"
 
 export async function generateMetadata({
   params,
@@ -38,6 +44,21 @@ export default async function MemberPage({
 
   const archived = !!member.archived_at
   const accounts = member.broker_accounts
+  // CoinDCX holds crypto (Stage 10), so it can't be used for stock transactions.
+  const stockAccounts = accounts.filter(
+    (account) => account.broker !== "coindcx",
+  )
+
+  const transactions = await listMemberTransactions(member.id)
+  const { holdings, problems } = groupHoldings(
+    transactions.map(toHoldingTransaction),
+  )
+  const instruments = new Map(
+    transactions.map((transaction) => [
+      transaction.instrument_id,
+      transaction.instrument,
+    ]),
+  )
 
   return (
     <>
@@ -90,6 +111,23 @@ export default async function MemberPage({
       )}
 
       <div className="grid gap-4">
+        <HoldingsCard
+          memberId={member.id}
+          memberName={member.name}
+          archived={archived}
+          accounts={stockAccounts}
+          holdings={holdings}
+          problems={problems}
+          instruments={instruments}
+        />
+
+        <TransactionsCard
+          memberId={member.id}
+          archived={archived}
+          accounts={stockAccounts}
+          transactions={transactions}
+        />
+
         <Card>
           <CardHeader>
             <CardTitle>Accounts</CardTitle>
@@ -151,16 +189,6 @@ export default async function MemberPage({
             )}
           </CardContent>
         </Card>
-
-        <ComingSoon
-          stage={4}
-          title="Holdings"
-          items={[
-            "Opening balances and buy/sell entries for this member",
-            "Current holdings with quantity, average cost and invested amount",
-            "Value and P&L once prices arrive (Stages 5–6)",
-          ]}
-        />
       </div>
     </>
   )

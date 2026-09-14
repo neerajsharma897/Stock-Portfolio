@@ -62,6 +62,15 @@ export function formatPercent(
   return `${prefix}${Math.abs(value).toFixed(decimals)}%`
 }
 
+const quantityFormatter = new Intl.NumberFormat("en-IN", {
+  maximumFractionDigits: 8,
+})
+
+/** Share or unit counts: 1,250 · 12.5 · 0.00012345 */
+export function formatQuantity(value: number): string {
+  return quantityFormatter.format(value)
+}
+
 export function formatDate(value: string | Date): string {
   return new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",

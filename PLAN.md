@@ -432,9 +432,9 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 |---|---|---|---|
 | 1 | Foundation | Supabase project (only to log in) | ✅ Done |
 | 2 | Members & broker accounts | — | ✅ Built |
-| 3 | Stock list & search | — (public Angel One instrument file) | Next |
-| 4 | Transactions & holdings engine | — | |
-| 5 | Dashboard & member portfolio pages | — | |
+| 3 | Stock list & search | — (public Angel One instrument file) | ✅ Built (with 4) |
+| 4 | Transactions & holdings engine | — | ✅ Built |
+| 5 | Dashboard & member portfolio pages | — | Next |
 | 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | |
 | 7 | Deployment & scheduled jobs | Vercel | |
 | 8 | Mutual funds | — (AMFI is public) | |
@@ -461,17 +461,20 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - Owner-only gate on every signed-in page and Server Action
 - **Done when:** the 5 family members and their accounts are saved and editable
 
-### Stage 3: Stock list & search
-- Migration: `instruments`, `market_holidays`
-- Script to import Angel One's public `OpenAPIScripMaster.json` (NSE/BSE equity, ETF, SGB)
-- Fast search box (symbol / name / ISIN)
-- **Done when:** searching "TCS" or "Parag" finds the right instruments
+### Stage 3: Stock list & search ✅ (built together with Stage 4)
+- Migration `20260914140000_instruments_transactions.sql`: `instruments` with owner-only RLS
+- Settings → **Update stock list** downloads Angel One's public `OpenAPIScripMaster.json` (≈33 MB, link from the SmartAPI docs) and keeps NSE/BSE shares, SME shares, Sovereign Gold Bonds and indices. Entries that disappear are marked inactive, never deleted
+- Stock search by symbol in the transaction form (exact matches first, NSE before BSE)
+- The file has no ISIN or full company names, so search is by ticker ("RELIANCE", not "Reliance Industries")
+- `market_holidays` moved to Stage 6, where market hours are used
+- **Done when:** searching "TCS" or "NIFTYBEES" finds the right instruments
 
-### Stage 4: Transactions & holdings engine
-- Migration: `transactions`, `corporate_actions`, `holdings` view
-- Forms: opening balance, buy, sell (with charges, date, notes); edit/delete with confirmation
-- `lib/portfolio`: weighted average cost, FIFO lots, realized P&L, split/bonus adjustment, with unit tests
-- Member page: holdings table (qty, avg cost, invested)
+### Stage 4: Transactions & holdings engine ✅
+- Same migration: `transactions` (member, broker account, stock, type, quantity, price, charges, date, notes) with owner-only RLS; a composite foreign key ensures the account belongs to the member
+- Forms: opening balance, buy, sell; edit/delete with confirmation. A save or delete is refused if any sell would exceed the shares held on its date
+- `lib/portfolio`: FIFO lots, average cost including charges, realized P&L, with unit tests. Holdings are calculated in the app from transactions (no database view)
+- Member page: holdings table (quantity, average cost, invested, booked P&L) and transaction history
+- Stock splits and bonuses moved to Stage 12
 - **Done when:** every member's current holdings are entered and match their broker apps
 
 ### Stage 5: Dashboard & member portfolio pages
@@ -483,7 +486,7 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 
 ### Stage 6: Live prices (Angel One SmartAPI) → MVP
 - Server-side SmartAPI login with TOTP, session stored server-only
-- `/api/prices` with batching, 4-second cache, market-hours and holiday check
+- `/api/prices` with batching, 4-second cache, market-hours and holiday check (adds the `market_holidays` table)
 - 5-second refresh on dashboard/member pages, market open/closed badge
 - **Done when:** prices update live during market hours
 
@@ -519,6 +522,7 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - **Done when:** a monthly CAS upload confirms every member's holdings
 
 ### Stage 12: Extras & hardening
+- Stock splits and bonuses (corporate actions) applied to holdings
 - FDs, IPO applications, other assets (gold, PPF, bonds)
 - Capital gains report per member per FY, XIRR everywhere, Excel export
 - Remaining alerts (portfolio moves, news, reminders, weekly summary), Telegram bot commands

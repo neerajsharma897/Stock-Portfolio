@@ -81,6 +81,54 @@ export type Database = {
           },
         ]
       }
+      instruments: {
+        Row: {
+          created_at: string
+          exchange: Database["public"]["Enums"]["exchange"]
+          id: number
+          is_active: boolean
+          kind: Database["public"]["Enums"]["instrument_kind"]
+          last_seen_at: string
+          name: string
+          series: string | null
+          symbol: string
+          tick_size: number
+          token: string
+          trading_symbol: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exchange: Database["public"]["Enums"]["exchange"]
+          id?: never
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["instrument_kind"]
+          last_seen_at?: string
+          name: string
+          series?: string | null
+          symbol: string
+          tick_size?: number
+          token: string
+          trading_symbol: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exchange?: Database["public"]["Enums"]["exchange"]
+          id?: never
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["instrument_kind"]
+          last_seen_at?: string
+          name?: string
+          series?: string | null
+          symbol?: string
+          tick_size?: number
+          token?: string
+          trading_symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       members: {
         Row: {
           archived_at: string | null
@@ -117,6 +165,73 @@ export type Database = {
         }
         Relationships: []
       }
+      transactions: {
+        Row: {
+          broker_account_id: string
+          charges: number
+          created_at: string
+          id: string
+          instrument_id: number
+          member_id: string
+          notes: string | null
+          price: number
+          quantity: number
+          trade_date: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string
+        }
+        Insert: {
+          broker_account_id: string
+          charges?: number
+          created_at?: string
+          id?: string
+          instrument_id: number
+          member_id: string
+          notes?: string | null
+          price: number
+          quantity: number
+          trade_date: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+        }
+        Update: {
+          broker_account_id?: string
+          charges?: number
+          created_at?: string
+          id?: string
+          instrument_id?: number
+          member_id?: string
+          notes?: string | null
+          price?: number
+          quantity?: number
+          trade_date?: string
+          type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_broker_account_id_member_id_fkey"
+            columns: ["broker_account_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "broker_accounts"
+            referencedColumns: ["id", "member_id"]
+          },
+          {
+            foreignKeyName: "transactions_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: false
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -131,6 +246,8 @@ export type Database = {
         | "fivepaisa"
         | "coindcx"
         | "other"
+      exchange: "NSE" | "BSE"
+      instrument_kind: "equity" | "sgb" | "index"
       member_relation:
         | "self"
         | "spouse"
@@ -141,6 +258,7 @@ export type Database = {
         | "brother"
         | "sister"
         | "other"
+      transaction_type: "opening_balance" | "buy" | "sell"
     }
     CompositeTypes: { [_ in never]: never }
   }

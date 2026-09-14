@@ -1,0 +1,166 @@
+import { TriangleAlertIcon } from "lucide-react"
+
+import {
+  TransactionDialog,
+  type StockAccount,
+} from "@/app/(app)/members/[id]/transaction-dialog"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import type { TransactionInstrument } from "@/lib/data/transactions"
+import { formatINR, formatQuantity, formatSignedINR } from "@/lib/format"
+import { brokerAccountName } from "@/lib/members/options"
+import type { Holding, HoldingProblem } from "@/lib/portfolio/member-holdings"
+import { cn } from "@/lib/utils"
+
+export function HoldingsCard({
+  memberId,
+  memberName,
+  archived,
+  accounts,
+  holdings,
+  problems,
+  instruments,
+}: {
+  memberId: string
+  memberName: string
+  archived: boolean
+  accounts: StockAccount[]
+  holdings: Holding[]
+  problems: HoldingProblem[]
+  instruments: Map<number, TransactionInstrument>
+}) {
+  const accountsById = new Map(accounts.map((account) => [account.id, account]))
+  const symbolOf = (holding: { instrumentId: number }) =>
+    instruments.get(holding.instrumentId)?.symbol ?? "Unknown"
+
+  const current = holdings
+    .filter((holding) => holding.position.quantity > 0)
+    .sort((a, b) => symbolOf(a).localeCompare(symbolOf(b)))
+  const invested = current.reduce((sum, h) => sum + h.position.invested, 0)
+  const realized = holdings.reduce((sum, h) => sum + h.position.realizedPnl, 0)
+  const hasBookedPnl = holdings.some((h) => h.position.realizedPnl !== 0)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Holdings</CardTitle>
+        <CardDescription>
+          {current.length === 0
+            ? "No shares held yet."
+            : `${current.length} ${current.length === 1 ? "holding" : "holdings"} · ${formatINR(invested)} invested`}
+        </CardDescription>
+        {!archived && accounts.length > 0 && (
+          <CardAction>
+            <TransactionDialog memberId={memberId} accounts={accounts} />
+          </CardAction>
+        )}
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {problems.length > 0 && (
+          <div
+            role="alert"
+            className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          >
+            <TriangleAlertIcon
+              className="mt-0.5 size-4 shrink-0 text-destructive"
+              aria-hidden
+            />
+            <div className="grid gap-1">
+              <p className="font-medium">Some entries don&apos;t add up</p>
+              {problems.map((problem) => (
+                <p
+                  key={problem.transactionId}
+                  className="text-muted-foreground"
+                >
+                  {symbolOf(problem)}: {problem.message}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Add a stock broker account above before entering holdings.
+          </p>
+        ) : current.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {archived
+              ? "No holdings."
+              : `Add an opening balance for each stock ${memberName} already holds, using the quantity and average price from the broker app.`}
+          </p>
+        ) : (
+          <div className="-mx-4 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Stock
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">
+                    Quantity
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">
+                    Avg cost
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">
+                    Invested
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {current.map((holding) => {
+                  const instrument = instruments.get(holding.instrumentId)
+                  const account = accountsById.get(holding.brokerAccountId)
+                  return (
+                    <tr
+                      key={`${holding.brokerAccountId}:${holding.instrumentId}`}
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="font-medium">{symbolOf(holding)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {instrument?.exchange}
+                          {instrument?.kind === "sgb" && " · Gold bond"}
+                          {account && ` · ${brokerAccountName(account)}`}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">
+                        {formatQuantity(holding.position.quantity)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">
+                        {formatINR(holding.position.averageCost)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">
+                        {formatINR(holding.position.invested)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {hasBookedPnl && (
+          <p className="text-sm text-muted-foreground">
+            Booked from sells, after charges:{" "}
+            <span
+              className={cn(
+                "font-medium tabular-nums",
+                realized >= 0 ? "text-gain" : "text-loss",
+              )}
+            >
+              {formatSignedINR(realized)}
+            </span>
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}

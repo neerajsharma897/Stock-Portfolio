@@ -1,6 +1,8 @@
 import type { Metadata } from "next"
+import { unstable_rethrow } from "next/navigation"
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react"
 
+import { UpdateStockListButton } from "@/app/(app)/settings/update-stock-list-button"
 import { ComingSoon } from "@/components/coming-soon"
 import { PageHeader } from "@/components/layout/page-header"
 import {
@@ -11,7 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { requireUser } from "@/lib/auth"
-import { formatDate } from "@/lib/format"
+import {
+  getStockListStatus,
+  type StockListStatus,
+} from "@/lib/data/instruments"
+import { formatDate, formatQuantity } from "@/lib/format"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = { title: "Settings" }
@@ -45,13 +51,30 @@ function StatusRow({
   )
 }
 
+async function loadStockListStatus(): Promise<
+  { status: StockListStatus } | { error: string }
+> {
+  try {
+    return { status: await getStockListStatus() }
+  } catch (error) {
+    // Let Next.js redirects through; only real failures become a message.
+    unstable_rethrow(error)
+    return {
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
 export default async function SettingsPage() {
   const user = await requireUser()
   const supabase = await createClient()
-  const { data: owner, error } = await supabase
-    .from("app_owner")
-    .select("display_name, timezone, created_at")
-    .maybeSingle()
+  const [{ data: owner, error }, stockList] = await Promise.all([
+    supabase
+      .from("app_owner")
+      .select("display_name, timezone, created_at")
+      .maybeSingle(),
+    loadStockListStatus(),
+  ])
 
   return (
     <>
@@ -83,7 +106,7 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle>Setup status</CardTitle>
             <CardDescription>
-              Checks that Stage 1 is set up correctly.
+              Checks that the database is set up correctly.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -106,6 +129,48 @@ export default async function SettingsPage() {
                   : undefined
               }
             />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock list</CardTitle>
+            <CardDescription>
+              NSE and BSE shares and gold bonds from Angel One&apos;s public
+              instrument file. Used to pick stocks when adding transactions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {"error" in stockList ? (
+              <StatusRow
+                ok={false}
+                label="Stock list unavailable"
+                detail={`Run the stock list migration (see README). ${stockList.error}`}
+              />
+            ) : (
+              <>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                  <dt className="text-muted-foreground">Stocks & gold bonds</dt>
+                  <dd>
+                    {stockList.status.count > 0
+                      ? formatQuantity(stockList.status.count)
+                      : "None yet"}
+                  </dd>
+                  <dt className="text-muted-foreground">Last updated</dt>
+                  <dd>
+                    {stockList.status.lastUpdated
+                      ? formatDate(stockList.status.lastUpdated)
+                      : "Never"}
+                  </dd>
+                </dl>
+                <UpdateStockListButton hasList={stockList.status.count > 0} />
+                <p className="text-sm text-muted-foreground">
+                  {stockList.status.count > 0
+                    ? "Update every few weeks to pick up new listings."
+                    : "Download the list once before adding transactions. It takes up to a minute."}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
