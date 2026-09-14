@@ -2,12 +2,13 @@ import "server-only"
 
 import { unstable_rethrow } from "next/navigation"
 
-import { AngelOneError, fetchQuotes } from "@/lib/angelone/client"
+import { AngelOneError } from "@/lib/angelone/client"
 import { getAngelOneConfig, type AngelOneConfig } from "@/lib/angelone/config"
 import { requireOwner } from "@/lib/auth"
 import { listMarketHolidays, type MarketHoliday } from "@/lib/data/holidays"
 import { getMarketStatus, type MarketStatus } from "@/lib/market-hours"
 import type { LiveStatus } from "@/lib/prices/live-status"
+import { fetchAndSavePrices } from "@/lib/prices/save"
 import { createClient } from "@/lib/supabase/server"
 
 // How often Angel One is actually called, however often pages poll.
@@ -115,65 +116,17 @@ async function runRefresh(
   const interval = market.open ? OPEN_INTERVAL_MS : CLOSED_INTERVAL_MS
 
   try {
-    const supabase = await createClient()
-    const { data: rows, error } = await supabase
-      .from("transactions")
-      .select("instrument:instruments(id, exchange, token)")
-    if (error) throw new Error(`Couldn't load held stocks: ${error.message}`)
-
-    const instruments = new Map(
-      rows.map((row) => [row.instrument.id, row.instrument]),
+    const { saved, pricedAt } = await fetchAndSavePrices(
+      await createClient(),
+      config,
     )
-    let refreshed = 0
-
-    if (instruments.size > 0) {
-      const quotes = await fetchQuotes(
-        config,
-        [...instruments.values()].map(({ exchange, token }) => ({
-          exchange,
-          token,
-        })),
-      )
-      const idByToken = new Map(
-        [...instruments.values()].map((i) => [
-          `${i.exchange}:${i.token}`,
-          i.id,
-        ]),
-      )
-      const pricedAt = new Date().toISOString()
-      const updates = quotes.flatMap((quote) => {
-        const instrumentId = idByToken.get(`${quote.exchange}:${quote.token}`)
-        return instrumentId === undefined
-          ? []
-          : [
-              {
-                instrument_id: instrumentId,
-                last_price: quote.lastPrice,
-                previous_close: quote.previousClose,
-                source: "angelone" as const,
-                priced_at: pricedAt,
-              },
-            ]
-      })
-
-      if (updates.length > 0) {
-        const { error: saveError } = await supabase
-          .from("instrument_prices")
-          .upsert(updates, { onConflict: "instrument_id" })
-        if (saveError) {
-          throw new Error(`Couldn't save live prices: ${saveError.message}`)
-        }
-        store.lastFetchedAt = pricedAt
-        refreshed = updates.length
-      }
-    }
-
+    if (pricedAt) store.lastFetchedAt = pricedAt
     store.lastError = null
     store.nextAttemptAt = Date.now() + interval
     return {
       configured: true,
       market,
-      refreshed,
+      refreshed: saved,
       lastFetchedAt: store.lastFetchedAt,
       error: null,
     }

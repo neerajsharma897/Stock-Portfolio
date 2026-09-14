@@ -26,6 +26,12 @@ function redirectWithCookies(url: URL, from: NextResponse) {
 
 // Optimistic auth check only. Pages and Server Actions still call requireUser().
 export async function proxy(request: NextRequest) {
+  // Scheduled jobs have no session: their routes check CRON_SECRET instead.
+  // (Cron requests don't follow redirects, so a login redirect would skip the job.)
+  if (request.nextUrl.pathname.startsWith("/api/cron/")) {
+    return NextResponse.next()
+  }
+
   // Without Supabase settings the pages render a setup notice instead.
   if (!supabaseEnv) return NextResponse.next()
 

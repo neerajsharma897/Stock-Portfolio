@@ -71,6 +71,52 @@ While the market is open (Mon–Fri, 9:15 AM–3:30 PM India time, except listed
 and member pages refresh prices every 5 seconds. Outside market hours prices are fetched at most every
 30 minutes. SmartAPI allows 50 stocks per quote request and 1 quote request per second.
 
+## Deploying to Vercel (Stage 7)
+
+1. **Run the migration** `supabase/migrations/20260914170000_scheduled_jobs.sql` in the Supabase SQL Editor.
+2. **Push the code to a private GitHub repository.**
+3. **Import the repository in Vercel:** vercel.com → Add New → Project → pick the repository. Vercel detects Next.js.
+4. **Add environment variables** (Vercel → Project → Settings → Environment Variables), then redeploy:
+
+   | Name | Value |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | Same as in `.env.local` |
+   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Same as in `.env.local` |
+   | `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → Secret keys |
+   | `CRON_SECRET` | A random string: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+   | `ANGELONE_API_KEY`, `ANGELONE_CLIENT_CODE`, `ANGELONE_PIN`, `ANGELONE_TOTP_SECRET` | Optional, see step 5 above |
+
+5. **Point Supabase at the live site:** Supabase → Authentication → URL Configuration → **Site URL** = your Vercel address,
+   e.g. `https://family-portfolio.vercel.app`.
+6. **On the phone:** open the Vercel address, sign in, then use the browser's **Add to Home screen**.
+7. **Check the scheduled jobs:** Vercel → Project → Settings → Cron Jobs lists them, each with a **Run** button for testing.
+   Results show in the app under **Settings → Scheduled jobs**.
+
+### Scheduled jobs
+
+Defined in `vercel.json`. Times are UTC; on Vercel's free plan each job runs once a day, at some point within its hour.
+
+| Job | Schedule | What it does |
+|---|---|---|
+| Daily snapshot | Mon–Fri, 11:00 UTC (4:30–5:30 PM India) | Fetches closing prices from Angel One if set up, then saves each stock's close and each member's portfolio value for the day. Skips weekends and listed holidays. |
+| Stock list update | Mondays, 02:00 UTC (7:30–8:30 AM India) | Refreshes the stock list from Angel One's instrument file. |
+
+Vercel may occasionally skip or repeat a run; both jobs are safe to run again.
+
+### Weekly encrypted backups
+
+`.github/workflows/backup.yml` runs every Sunday at 2 AM India time (or on demand from the repository's **Actions** tab).
+It dumps the app's data, encrypts it with your passphrase and keeps the file for 90 days as a workflow artifact.
+
+1. GitHub → repository → Settings → Secrets and variables → Actions → **New repository secret**:
+   - `SUPABASE_DB_URL`: Supabase → **Connect** → **Session pooler** connection string, with the database password filled in.
+     The direct connection doesn't work from GitHub's servers.
+   - `BACKUP_PASSPHRASE`: a long passphrase. **Keep a copy somewhere safe: backups can't be opened without it.**
+2. Run the workflow once from the Actions tab and check a backup file appears.
+
+To open a backup: `gpg --decrypt family-portfolio-YYYY-MM-DD.sql.gz.gpg | gunzip > backup.sql`.
+Restoring into Supabase needs care (the sign-in account lives in Supabase Auth, not in the backup), so plan it before you need it.
+
 ## Scripts
 
 | Command | What it does |

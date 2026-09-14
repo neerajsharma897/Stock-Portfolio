@@ -20,13 +20,26 @@ import {
   getStockListStatus,
   type StockListStatus,
 } from "@/lib/data/instruments"
+import { listLatestJobRuns, type JobRun } from "@/lib/data/jobs"
 import { todayInIndia } from "@/lib/dates"
 import { formatDate, formatQuantity } from "@/lib/format"
+import { JOB_NAMES, JOBS, type JobName } from "@/lib/jobs/names"
 import { getLiveStatus } from "@/lib/prices/live"
 import { describeLiveStatus, type LiveStatus } from "@/lib/prices/live-status"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = { title: "Settings" }
+
+// A run still "running" after this long was stopped by the platform's time limit.
+const STALLED_RUN_MS = 15 * 60_000
+
+const dateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+})
 
 function StatusRow({
   ok,
@@ -116,6 +129,67 @@ function LivePricesCard({ status }: { status: LiveStatus }) {
   )
 }
 
+function describeJobRun(run: JobRun): {
+  ok: boolean
+  label: string
+  detail: string
+} {
+  const when = dateTimeFormatter.format(new Date(run.startedAt))
+  const stalled =
+    run.status === "running" &&
+    Date.now() - new Date(run.startedAt).getTime() > STALLED_RUN_MS
+
+  if (stalled) {
+    return {
+      ok: false,
+      label: "didn't finish",
+      detail: `Started ${when} and was stopped before finishing.`,
+    }
+  }
+  const labels: Record<JobRun["status"], string> = {
+    running: "running now",
+    success: "succeeded",
+    skipped: "skipped",
+    failed: "failed",
+  }
+  const text = [run.summary, run.error].filter(Boolean).join(" · ")
+  return {
+    ok: run.status !== "failed",
+    label: labels[run.status],
+    detail: text ? `${when} · ${text}` : when,
+  }
+}
+
+function JobsCard({ runs }: { runs: Record<JobName, JobRun | null> }) {
+  return (
+    <div className="grid gap-4">
+      {JOB_NAMES.map((job) => {
+        const run = runs[job]
+        const { label, schedule } = JOBS[job]
+        if (!run) {
+          return (
+            <StatusRow
+              key={job}
+              ok
+              label={`${label}: not run yet`}
+              detail={`${schedule}. Runs only on the deployed site.`}
+            />
+          )
+        }
+        const described = describeJobRun(run)
+        return (
+          <StatusRow
+            key={job}
+            ok={described.ok}
+            label={`${label}: ${described.label}`}
+            detail={described.detail}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 function HolidayList({ holidays }: { holidays: MarketHoliday[] }) {
   if (holidays.length === 0) {
     return (
@@ -154,7 +228,7 @@ function HolidayList({ holidays }: { holidays: MarketHoliday[] }) {
 export default async function SettingsPage() {
   const user = await requireUser()
   const supabase = await createClient()
-  const [{ data: owner, error }, stockList, liveStatus, holidays] =
+  const [{ data: owner, error }, stockList, liveStatus, holidays, jobRuns] =
     await Promise.all([
       supabase
         .from("app_owner")
@@ -165,6 +239,7 @@ export default async function SettingsPage() {
       attempt<MarketHoliday[]>(() =>
         listMarketHolidays({ from: todayInIndia() }),
       ),
+      attempt(listLatestJobRuns),
     ])
 
   return (
@@ -257,7 +332,7 @@ export default async function SettingsPage() {
                 <UpdateStockListButton hasList={stockList.value.count > 0} />
                 <p className="text-sm text-muted-foreground">
                   {stockList.value.count > 0
-                    ? "Update every few weeks to pick up new listings."
+                    ? "Updated automatically every Monday once the app is deployed, or update now."
                     : "Download the list once before adding transactions. It takes up to a minute."}
                 </p>
               </>
@@ -278,10 +353,31 @@ export default async function SettingsPage() {
               <StatusRow
                 ok={false}
                 label="Live prices unavailable"
-                detail={`Run the market holidays migration (see README). ${liveStatus.error}`}
+                detail={liveStatus.error}
               />
             ) : (
               <LivePricesCard status={liveStatus.value} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Scheduled jobs</CardTitle>
+            <CardDescription>
+              Automatic tasks on the deployed site: daily portfolio snapshots
+              and the weekly stock list update.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {"error" in jobRuns ? (
+              <StatusRow
+                ok={false}
+                label="Job history unavailable"
+                detail={`Run the scheduled jobs migration (see README). ${jobRuns.error}`}
+              />
+            ) : (
+              <JobsCard runs={jobRuns.value} />
             )}
           </CardContent>
         </Card>
@@ -290,8 +386,8 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle>Market holidays</CardTitle>
             <CardDescription>
-              Weekdays when NSE and BSE are closed. Live prices aren&apos;t
-              fetched on these days.
+              Weekdays when NSE and BSE are closed. Live prices and the daily
+              snapshot skip these days.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5">

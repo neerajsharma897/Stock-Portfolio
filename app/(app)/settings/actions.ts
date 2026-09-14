@@ -18,7 +18,9 @@ export async function updateStockList(): Promise<FormState> {
   await requireOwner()
 
   try {
-    const { imported, deactivated } = await importInstruments()
+    const { imported, deactivated } = await importInstruments(
+      await createClient(),
+    )
     refresh()
     const delisted =
       deactivated > 0

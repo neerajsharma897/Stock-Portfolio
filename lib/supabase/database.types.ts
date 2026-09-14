@@ -81,6 +81,35 @@ export type Database = {
           },
         ]
       }
+      eod_prices: {
+        Row: {
+          close_price: number
+          created_at: string
+          instrument_id: number
+          price_date: string
+        }
+        Insert: {
+          close_price: number
+          created_at?: string
+          instrument_id: number
+          price_date: string
+        }
+        Update: {
+          close_price?: number
+          created_at?: string
+          instrument_id?: number
+          price_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eod_prices_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: false
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instrument_prices: {
         Row: {
           instrument_id: number
@@ -164,6 +193,36 @@ export type Database = {
         }
         Relationships: []
       }
+      job_runs: {
+        Row: {
+          error: string | null
+          finished_at: string | null
+          id: number
+          job: string
+          started_at: string
+          status: Database["public"]["Enums"]["job_status"]
+          summary: string | null
+        }
+        Insert: {
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          job: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          summary?: string | null
+        }
+        Update: {
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          job?: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          summary?: string | null
+        }
+        Relationships: []
+      }
       market_holidays: {
         Row: {
           created_at: string
@@ -217,6 +276,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      portfolio_snapshots: {
+        Row: {
+          created_at: string
+          current_value: number
+          holding_count: number
+          invested: number
+          member_id: string
+          priced_count: number
+          realized_pnl: number
+          snapshot_date: string
+          unrealized_pnl: number
+        }
+        Insert: {
+          created_at?: string
+          current_value: number
+          holding_count: number
+          invested: number
+          member_id: string
+          priced_count: number
+          realized_pnl: number
+          snapshot_date: string
+          unrealized_pnl: number
+        }
+        Update: {
+          created_at?: string
+          current_value?: number
+          holding_count?: number
+          invested?: number
+          member_id?: string
+          priced_count?: number
+          realized_pnl?: number
+          snapshot_date?: string
+          unrealized_pnl?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_snapshots_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
@@ -301,6 +404,7 @@ export type Database = {
         | "other"
       exchange: "NSE" | "BSE"
       instrument_kind: "equity" | "sgb" | "index"
+      job_status: "running" | "success" | "skipped" | "failed"
       member_relation:
         | "self"
         | "spouse"

@@ -1,7 +1,7 @@
 import "server-only"
 
 import { requireOwner } from "@/lib/auth"
-import { listPrices } from "@/lib/data/prices"
+import { fetchPrices } from "@/lib/data/prices"
 import {
   toHoldingTransaction,
   type TransactionInstrument,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/portfolio/valuation"
 import type { Tables } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
+import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 export type MemberPortfolio = {
   member: Pick<Tables<"members">, "id" | "name" | "color" | "relation">
@@ -41,8 +42,13 @@ export type FamilyPortfolio = {
 /** Every active (not archived) member's holdings, valued with saved prices. */
 export async function getFamilyPortfolio(): Promise<FamilyPortfolio> {
   await requireOwner()
-  const supabase = await createClient()
+  return buildFamilyPortfolio(await createClient())
+}
 
+/** Same as getFamilyPortfolio, with any client (scheduled jobs use the admin client). */
+export async function buildFamilyPortfolio(
+  supabase: AppSupabaseClient,
+): Promise<FamilyPortfolio> {
   const { data: members, error: membersError } = await supabase
     .from("members")
     .select("id, name, color, relation")
@@ -72,7 +78,7 @@ export async function getFamilyPortfolio(): Promise<FamilyPortfolio> {
       transaction.instrument,
     ]),
   )
-  const prices = await listPrices(instruments.keys())
+  const prices = await fetchPrices(supabase, instruments.keys())
 
   const memberPortfolios = members.map((member) => {
     const { holdings, problems } = groupHoldings(

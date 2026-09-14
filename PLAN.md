@@ -436,8 +436,8 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 4 | Transactions & holdings engine | — | ✅ Built |
 | 5 | Dashboard & member portfolio pages | — | ✅ Built |
 | 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | ✅ Built |
-| 7 | Deployment & scheduled jobs | Vercel | Next |
-| 8 | Mutual funds | — (AMFI is public) | |
+| 7 | Deployment & scheduled jobs | Vercel | ✅ Built |
+| 8 | Mutual funds | — (AMFI is public) | Next |
 | 9 | Telegram alerts (launch set) | Telegram bot token | |
 | 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | |
 | 11 | Imports & reconciliation | CoinDCX read-only key (optional) | |
@@ -497,10 +497,16 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - Session renewal is in memory, so a serverless deployment logs in again after cold starts (revisit in Stage 7)
 - **Done when:** prices update live during market hours
 
-### Stage 7: Deployment & scheduled jobs
-- Deploy to Vercel; Supabase auth URLs for production
-- pg_cron + Edge Functions: instrument sync, Angel One login, EOD snapshot, `job_runs` log (adds `eod_prices` and `portfolio_snapshots`)
-- Weekly DB backup (GitHub Action `pg_dump`)
+### Stage 7: Deployment & scheduled jobs ✅
+- Deploy to Vercel (steps in README); Supabase Site URL set to the production address
+- **Vercel Cron instead of pg_cron + Edge Functions**, so jobs reuse the app's TypeScript code. Free plan: once a day per job, somewhere within the scheduled hour, best effort (runs can be skipped or repeated)
+- Migration `20260914170000_scheduled_jobs.sql`: `job_runs`, `eod_prices`, `portfolio_snapshots` (owner can read; jobs write with the secret key)
+- `/api/cron/daily-snapshot` (weekdays after close): Angel One closing prices if set up, daily member snapshots and stock closes; skips weekends and holidays; idempotent upserts
+- `/api/cron/stock-list` (Mondays before open): refreshes the stock list
+- Cron routes check `CRON_SECRET` (constant-time) and are exempt from the login redirect; jobs use a server-only admin Supabase client
+- Settings shows the latest run of each job; security headers in `next.config.ts`
+- Weekly encrypted backup: GitHub Action (`pg_dump` → gzip → GPG AES-256) kept as a 90-day artifact
+- Angel One sessions stay in memory per server instance; on Vercel a cold start means a fresh login, which is within SmartAPI's limits for one user
 - **Done when:** Dad uses it from his phone and daily jobs run on their own
 
 ### Stage 8: Mutual funds

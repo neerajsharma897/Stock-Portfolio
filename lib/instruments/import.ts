@@ -1,7 +1,7 @@
 import "server-only"
 
 import { parseScripMaster } from "@/lib/instruments/parse"
-import { createClient } from "@/lib/supabase/server"
+import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 // Official links from the Instruments section of Angel One's SmartAPI docs.
 // The second is a fallback if the first is down.
@@ -33,8 +33,13 @@ async function downloadInstrumentFile(): Promise<unknown> {
 
 export type ImportSummary = { imported: number; deactivated: number }
 
-/** Downloads the instrument file and upserts it. Callers must check requireOwner() first. */
-export async function importInstruments(): Promise<ImportSummary> {
+/**
+ * Downloads the instrument file and upserts it. Pass the signed-in owner's
+ * client (after requireOwner()) or the admin client in a scheduled job.
+ */
+export async function importInstruments(
+  supabase: AppSupabaseClient,
+): Promise<ImportSummary> {
   const records = parseScripMaster(await downloadInstrumentFile())
   if (records.length < MIN_EXPECTED_RECORDS) {
     throw new Error(
@@ -43,7 +48,6 @@ export async function importInstruments(): Promise<ImportSummary> {
   }
 
   const seenAt = new Date().toISOString()
-  const supabase = await createClient()
 
   for (let start = 0; start < records.length; start += BATCH_SIZE) {
     const batch = records

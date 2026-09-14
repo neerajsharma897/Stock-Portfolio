@@ -3,17 +3,24 @@ import "server-only"
 import { requireOwner } from "@/lib/auth"
 import type { Price } from "@/lib/portfolio/valuation"
 import { createClient } from "@/lib/supabase/server"
+import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 /** Latest saved price for each of the given stocks that has one. */
 export async function listPrices(
   instrumentIds: Iterable<number>,
 ): Promise<Map<number, Price>> {
   await requireOwner()
+  return fetchPrices(await createClient(), instrumentIds)
+}
 
+/** Same as listPrices, with any client (scheduled jobs use the admin client). */
+export async function fetchPrices(
+  supabase: AppSupabaseClient,
+  instrumentIds: Iterable<number>,
+): Promise<Map<number, Price>> {
   const ids = [...new Set(instrumentIds)]
   if (ids.length === 0) return new Map()
 
-  const supabase = await createClient()
   const { data, error } = await supabase
     .from("instrument_prices")
     .select("instrument_id, last_price, previous_close, priced_at, source")
