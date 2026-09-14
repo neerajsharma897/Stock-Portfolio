@@ -277,6 +277,139 @@ export type Database = {
         }
         Relationships: []
       }
+      mf_schemes: {
+        Row: {
+          amc: string
+          amfi_code: number
+          category: string | null
+          created_at: string
+          is_active: boolean
+          isin_growth: string | null
+          isin_reinvest: string | null
+          last_seen_at: string
+          name: string
+          nav: number | null
+          nav_date: string | null
+          option_label: string | null
+          option_type: Database["public"]["Enums"]["mf_option"] | null
+          plan: Database["public"]["Enums"]["mf_plan"] | null
+          previous_nav: number | null
+          previous_nav_date: string | null
+          scheme_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          amc: string
+          amfi_code: number
+          category?: string | null
+          created_at?: string
+          is_active?: boolean
+          isin_growth?: string | null
+          isin_reinvest?: string | null
+          last_seen_at?: string
+          name: string
+          nav?: number | null
+          nav_date?: string | null
+          option_label?: string | null
+          option_type?: Database["public"]["Enums"]["mf_option"] | null
+          plan?: Database["public"]["Enums"]["mf_plan"] | null
+          previous_nav?: number | null
+          previous_nav_date?: string | null
+          scheme_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amc?: string
+          amfi_code?: number
+          category?: string | null
+          created_at?: string
+          is_active?: boolean
+          isin_growth?: string | null
+          isin_reinvest?: string | null
+          last_seen_at?: string
+          name?: string
+          nav?: number | null
+          nav_date?: string | null
+          option_label?: string | null
+          option_type?: Database["public"]["Enums"]["mf_option"] | null
+          plan?: Database["public"]["Enums"]["mf_plan"] | null
+          previous_nav?: number | null
+          previous_nav_date?: string | null
+          scheme_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mf_transactions: {
+        Row: {
+          amfi_code: number
+          broker_account_id: string
+          charges: number
+          created_at: string
+          folio_number: string | null
+          id: string
+          member_id: string
+          nav: number
+          notes: string | null
+          trade_date: string
+          type: Database["public"]["Enums"]["mf_transaction_type"]
+          units: number
+          updated_at: string
+        }
+        Insert: {
+          amfi_code: number
+          broker_account_id: string
+          charges?: number
+          created_at?: string
+          folio_number?: string | null
+          id?: string
+          member_id: string
+          nav: number
+          notes?: string | null
+          trade_date: string
+          type: Database["public"]["Enums"]["mf_transaction_type"]
+          units: number
+          updated_at?: string
+        }
+        Update: {
+          amfi_code?: number
+          broker_account_id?: string
+          charges?: number
+          created_at?: string
+          folio_number?: string | null
+          id?: string
+          member_id?: string
+          nav?: number
+          notes?: string | null
+          trade_date?: string
+          type?: Database["public"]["Enums"]["mf_transaction_type"]
+          units?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mf_transactions_amfi_code_fkey"
+            columns: ["amfi_code"]
+            isOneToOne: false
+            referencedRelation: "mf_schemes"
+            referencedColumns: ["amfi_code"]
+          },
+          {
+            foreignKeyName: "mf_transactions_broker_account_id_member_id_fkey"
+            columns: ["broker_account_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "broker_accounts"
+            referencedColumns: ["id", "member_id"]
+          },
+          {
+            foreignKeyName: "mf_transactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_snapshots: {
         Row: {
           created_at: string
@@ -416,6 +549,9 @@ export type Database = {
         | "brother"
         | "sister"
         | "other"
+      mf_option: "growth" | "idcw"
+      mf_plan: "direct" | "regular"
+      mf_transaction_type: "opening_balance" | "purchase" | "sip" | "redemption"
       price_source: "manual" | "angelone"
       transaction_type: "opening_balance" | "buy" | "sell"
     }

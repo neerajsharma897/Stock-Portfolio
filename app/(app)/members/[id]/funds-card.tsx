@@ -1,9 +1,8 @@
 import { TriangleAlertIcon } from "lucide-react"
 
-import {
-  TransactionDialog,
-  type StockAccount,
-} from "@/app/(app)/members/[id]/transaction-dialog"
+import { FundTransactionDialog } from "@/app/(app)/members/[id]/fund-transaction-dialog"
+import type { StockAccount } from "@/app/(app)/members/[id]/transaction-dialog"
+import { FundName } from "@/components/fund-name"
 import { toneOf, toneTextClass } from "@/components/stat-tile"
 import {
   Card,
@@ -13,73 +12,73 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { UpdatePricesDialog } from "@/components/update-prices-dialog"
-import type { TransactionInstrument } from "@/lib/data/transactions"
+import type { FundScheme } from "@/lib/data/mutual-funds"
 import {
+  formatDate,
   formatINR,
   formatPercent,
   formatQuantity,
   formatSignedINR,
 } from "@/lib/format"
 import { brokerAccountName } from "@/lib/members/options"
-import type { HoldingProblem } from "@/lib/portfolio/member-holdings"
-import type { PriceItem, ValuedHolding } from "@/lib/portfolio/valuation"
+import type { FundProblem, ValuedFund } from "@/lib/mutual-funds/portfolio"
 import { cn } from "@/lib/utils"
 
-function NoPrice() {
+function NoNav() {
   return (
     <span className="text-muted-foreground">
-      —<span className="sr-only">no price yet</span>
+      —<span className="sr-only">no NAV yet</span>
     </span>
   )
 }
 
-export function HoldingsCard({
+export function FundsCard({
   memberId,
   memberName,
   archived,
   accounts,
-  holdings,
+  funds,
   problems,
-  instruments,
-  priceItems,
+  schemes,
+  xirr,
 }: {
   memberId: string
   memberName: string
   archived: boolean
   accounts: StockAccount[]
-  holdings: ValuedHolding[]
-  problems: HoldingProblem[]
-  instruments: Map<number, TransactionInstrument>
-  priceItems: PriceItem[]
+  funds: ValuedFund[]
+  problems: FundProblem[]
+  schemes: Map<number, FundScheme>
+  xirr: number | null
 }) {
   const accountsById = new Map(accounts.map((account) => [account.id, account]))
-  const symbolOf = (holding: { instrumentId: number }) =>
-    instruments.get(holding.instrumentId)?.symbol ?? "Unknown"
+  const nameOf = (fund: { amfiCode: number }) =>
+    schemes.get(fund.amfiCode)?.name ?? "Unknown fund"
 
-  const current = holdings
-    .filter((holding) => holding.position.quantity > 0)
-    .sort((a, b) => symbolOf(a).localeCompare(symbolOf(b)))
-  const invested = current.reduce((sum, h) => sum + h.position.invested, 0)
-  const realized = holdings.reduce((sum, h) => sum + h.position.realizedPnl, 0)
-  const hasBookedPnl = holdings.some((h) => h.position.realizedPnl !== 0)
+  const current = funds
+    .filter((fund) => fund.position.quantity > 0)
+    .sort(
+      (a, b) =>
+        (b.currentValue ?? 0) - (a.currentValue ?? 0) ||
+        nameOf(a).localeCompare(nameOf(b)),
+    )
+  const invested = current.reduce((sum, f) => sum + f.position.invested, 0)
+  const realized = funds.reduce((sum, f) => sum + f.position.realizedPnl, 0)
+  const hasBookedPnl = funds.some((f) => f.position.realizedPnl !== 0)
   const canAdd = !archived && accounts.length > 0
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Stocks</CardTitle>
+        <CardTitle>Mutual funds</CardTitle>
         <CardDescription>
           {current.length === 0
-            ? "No shares held yet."
-            : `${current.length} ${current.length === 1 ? "holding" : "holdings"} · ${formatINR(invested)} invested`}
+            ? "No funds held yet."
+            : `${current.length} ${current.length === 1 ? "fund" : "funds"} · ${formatINR(invested)} invested${xirr !== null ? ` · ${formatPercent(xirr * 100)} XIRR` : ""}`}
         </CardDescription>
-        {(canAdd || priceItems.length > 0) && (
-          <CardAction className="flex flex-wrap justify-end gap-2">
-            <UpdatePricesDialog items={priceItems} />
-            {canAdd && (
-              <TransactionDialog memberId={memberId} accounts={accounts} />
-            )}
+        {canAdd && (
+          <CardAction>
+            <FundTransactionDialog memberId={memberId} accounts={accounts} />
           </CardAction>
         )}
       </CardHeader>
@@ -94,13 +93,13 @@ export function HoldingsCard({
               aria-hidden
             />
             <div className="grid gap-1">
-              <p className="font-medium">Some entries don&apos;t add up</p>
+              <p className="font-medium">Some fund entries don&apos;t add up</p>
               {problems.map((problem) => (
                 <p
                   key={problem.transactionId}
                   className="text-muted-foreground"
                 >
-                  {symbolOf(problem)}: {problem.message}
+                  {nameOf(problem)}: {problem.message}
                 </p>
               ))}
             </div>
@@ -109,107 +108,110 @@ export function HoldingsCard({
 
         {accounts.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Add a stock broker account below before entering holdings.
+            Add the platform the funds are held on (e.g. Groww or Zerodha) under
+            Accounts before entering funds.
           </p>
         ) : current.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {archived
-              ? "No holdings."
-              : `Add an opening balance for each stock ${memberName} already holds, using the quantity and average price from the broker app.`}
+              ? "No funds."
+              : `Add an opening balance for each fund ${memberName} already holds, using the units and invested amount from the platform or statement.`}
           </p>
         ) : (
           <div className="-mx-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
                   <th scope="col" className="px-4 py-2 font-medium">
-                    Stock
+                    Fund
                   </th>
                   <th scope="col" className="px-4 py-2 text-right font-medium">
-                    Quantity
+                    Units
                   </th>
                   <th scope="col" className="px-4 py-2 text-right font-medium">
                     Avg cost
                   </th>
                   <th scope="col" className="px-4 py-2 text-right font-medium">
-                    Last price
+                    Latest NAV
                   </th>
                   <th scope="col" className="px-4 py-2 text-right font-medium">
                     Current value
                   </th>
                   <th scope="col" className="px-4 py-2 text-right font-medium">
-                    P&amp;L
+                    Returns
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {current.map((holding) => {
-                  const instrument = instruments.get(holding.instrumentId)
-                  const account = accountsById.get(holding.brokerAccountId)
-                  const pnlTone = toneTextClass(toneOf(holding.unrealizedPnl))
+                {current.map((fund) => {
+                  const account = accountsById.get(fund.brokerAccountId)
+                  const pnlTone = toneTextClass(toneOf(fund.unrealizedPnl))
 
                   return (
-                    <tr
-                      key={`${holding.brokerAccountId}:${holding.instrumentId}`}
-                    >
-                      <td className="px-4 py-2.5">
-                        <div className="font-medium">{symbolOf(holding)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {instrument?.exchange}
-                          {instrument?.kind === "sgb" && " · Gold bond"}
-                          {account && ` · ${brokerAccountName(account)}`}
-                        </div>
+                    <tr key={`${fund.brokerAccountId}:${fund.amfiCode}`}>
+                      <td className="max-w-80 px-4 py-2.5">
+                        <FundName
+                          scheme={schemes.get(fund.amfiCode)}
+                          detail={account && brokerAccountName(account)}
+                        />
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {formatQuantity(holding.position.quantity)}
+                        {formatQuantity(fund.position.quantity)}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {formatINR(holding.position.averageCost)}
+                        {formatINR(fund.position.averageCost, 4)}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {holding.price ? (
+                        {fund.price ? (
                           <>
-                            <div>{formatINR(holding.price.lastPrice)}</div>
-                            {holding.dayChangePct !== null && (
-                              <div
-                                className={cn(
-                                  "text-xs",
-                                  toneTextClass(toneOf(holding.dayChange)),
-                                )}
-                              >
-                                {formatPercent(holding.dayChangePct)}
-                                <span className="sr-only"> today</span>
-                              </div>
-                            )}
+                            <div>{formatINR(fund.price.lastPrice, 4)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {fund.dayChangePct !== null && (
+                                <span
+                                  className={toneTextClass(
+                                    toneOf(fund.dayChange),
+                                  )}
+                                >
+                                  {formatPercent(fund.dayChangePct)}{" "}
+                                </span>
+                              )}
+                              <span className="sr-only">on </span>
+                              {formatDate(fund.price.pricedAt)}
+                            </div>
                           </>
                         ) : (
-                          <NoPrice />
+                          <NoNav />
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {holding.currentValue !== null ? (
-                          formatINR(holding.currentValue)
+                        {fund.currentValue !== null ? (
+                          formatINR(fund.currentValue)
                         ) : (
-                          <NoPrice />
+                          <NoNav />
                         )}
                         <div className="text-xs text-muted-foreground">
-                          {formatINR(holding.position.invested)} invested
+                          {formatINR(fund.position.invested)} invested
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {holding.unrealizedPnl !== null ? (
+                        {fund.unrealizedPnl !== null ? (
                           <>
                             <div className={cn("font-medium", pnlTone)}>
-                              {formatSignedINR(holding.unrealizedPnl)}
+                              {formatSignedINR(fund.unrealizedPnl)}
                             </div>
-                            {holding.unrealizedPct !== null && (
+                            {fund.unrealizedPct !== null && (
                               <div className={cn("text-xs", pnlTone)}>
-                                {formatPercent(holding.unrealizedPct)}
+                                {formatPercent(fund.unrealizedPct)}
+                              </div>
+                            )}
+                            {fund.xirr !== null && (
+                              <div className="text-xs text-muted-foreground">
+                                {formatPercent(fund.xirr * 100)} XIRR
                               </div>
                             )}
                           </>
                         ) : (
-                          <NoPrice />
+                          <NoNav />
                         )}
                       </td>
                     </tr>
@@ -222,7 +224,7 @@ export function HoldingsCard({
 
         {hasBookedPnl && (
           <p className="text-sm text-muted-foreground">
-            Booked from sells, after charges:{" "}
+            Booked from redemptions, after charges:{" "}
             <span
               className={cn(
                 "font-medium tabular-nums",

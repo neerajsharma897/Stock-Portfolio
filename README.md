@@ -71,6 +71,18 @@ While the market is open (Mon–Fri, 9:15 AM–3:30 PM India time, except listed
 and member pages refresh prices every 5 seconds. Outside market hours prices are fetched at most every
 30 minutes. SmartAPI allows 50 stocks per quote request and 1 quote request per second.
 
+## Mutual funds (Stage 8)
+
+1. Run `supabase/migrations/20260915120000_mutual_funds.sql` in the Supabase SQL Editor.
+2. Settings → **Mutual fund list** → **Download fund list**. It fetches AMFI's public NAV file (about 14,000 funds) and
+   takes under a minute.
+3. Open a member → **Add fund entry**. Pick the exact plan (Direct or Regular, Growth or IDCW) and add an opening balance
+   with the units and average NAV (amount invested ÷ units) from the platform or statement. Add purchases, SIP
+   instalments and redemptions as they happen.
+
+NAVs refresh automatically on weekday nights once deployed. XIRR appears once money has been invested for a year; use the
+first investment date for opening balances to get a meaningful figure.
+
 ## Deploying to Vercel (Stage 7)
 
 1. **Run the migrations** `supabase/migrations/20260914170000_scheduled_jobs.sql` and then
@@ -101,17 +113,18 @@ Defined in `vercel.json`. Times are UTC; on Vercel's free plan each job runs onc
 | Job | Schedule | What it does |
 |---|---|---|
 | Daily snapshot | Mon–Fri, 11:00 UTC (4:30–5:30 PM India) | Fetches closing prices from Angel One if set up, then saves each stock's close and each member's portfolio value for the day. Skips weekends and listed holidays. |
+| Mutual fund NAVs | Mon–Fri, 18:00 UTC (11:30 PM–12:30 AM India) | Downloads AMFI's NAV file: new funds, latest NAVs, and closed funds marked inactive. |
 | Stock list update | Mondays, 02:00 UTC (7:30–8:30 AM India) | Refreshes the stock list from Angel One's instrument file. |
 
-Vercel may occasionally skip or repeat a run; both jobs are safe to run again.
+Vercel may occasionally skip or repeat a run; every job is safe to run again.
 
 ### Backups, export and restore
 
 Run `supabase/migrations/20260915100000_backup_restore.sql` first.
 
 **Download data** (Settings → Backup & restore) saves everything you've entered as one JSON file: members, accounts,
-transactions, prices, holidays and daily history. The stock list isn't included (download it again from Settings) and
-neither is the sign-in account. The file isn't encrypted, so keep it somewhere private.
+stock transactions, mutual fund entries, prices, holidays and daily history. The stock and fund lists aren't included
+(download them again from Settings) and neither is the sign-in account. The file isn't encrypted, so keep it somewhere private.
 
 **Weekly encrypted backup:** `.github/workflows/backup.yml` runs every Sunday at 2 AM India time (or on demand from the
 repository's **Actions** tab). It downloads the same export from the live site, encrypts it with your passphrase
@@ -127,7 +140,8 @@ repository's **Actions** tab). It downloads the same export from the live site, 
 **Restore:** Settings → Backup & restore → choose a downloaded export or a backup file (GitHub downloads artifacts as a
 .zip, so unzip it first) → enter the passphrase if it's encrypted → **Check file** shows what's inside → **Replace all data**.
 Restoring replaces everything with the file's contents in one database transaction: if anything fails, nothing changes.
-Download the stock list first, since stocks are matched by exchange and code.
+Download the stock list and fund list first, since stocks are matched by exchange and code and funds by AMFI code.
+Backups made before Stage 8 still restore.
 
 ## Scripts
 

@@ -2,6 +2,7 @@
 // whole family. Holdings without a price are counted but left out of current
 // value and P&L, so a missing price never shows up as a loss.
 
+import type { Position } from "@/lib/portfolio/holdings"
 import type { Holding } from "@/lib/portfolio/member-holdings"
 
 export type Price = {
@@ -101,9 +102,16 @@ export function valueHolding(
   }
 }
 
-export function summarize(
-  holdings: readonly ValuedHolding[],
-): PortfolioSummary {
+/** What summarize needs. Stock and mutual fund holdings both fit. */
+export type SummaryInput = {
+  position: Pick<Position, "quantity" | "invested" | "realizedPnl">
+  price: { pricedAt: string } | null
+  currentValue: number | null
+  unrealizedPnl: number | null
+  dayChange: number | null
+}
+
+export function summarize(holdings: readonly SummaryInput[]): PortfolioSummary {
   let holdingCount = 0
   let pricedCount = 0
   let invested = 0

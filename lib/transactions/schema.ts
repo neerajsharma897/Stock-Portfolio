@@ -6,7 +6,7 @@ import { TRANSACTION_TYPES } from "@/lib/transactions/options"
 // Stays within the database columns: numeric(20,8), numeric(18,4) and numeric(14,2).
 const MAX_AMOUNT = 1e12
 
-function isBlank(value: unknown) {
+export function isBlank(value: unknown) {
   return (
     value === undefined ||
     value === null ||
@@ -15,7 +15,7 @@ function isBlank(value: unknown) {
 }
 
 /** A number typed by a person, e.g. "1,250.50", with at most `maxDecimals` decimals. */
-function decimal(
+export function decimal(
   label: string,
   maxDecimals: number,
   { allowZero = false } = {},

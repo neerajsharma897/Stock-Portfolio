@@ -438,8 +438,8 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | ✅ Built |
 | 7 | Deployment & scheduled jobs | Vercel | ✅ Built |
 | 7b | Export & restore | — | ✅ Built |
-| 8 | Mutual funds | — (AMFI is public) | Next |
-| 9 | Telegram alerts (launch set) | Telegram bot token | |
+| 8 | Mutual funds | — (AMFI is public) | ✅ Built |
+| 9 | Telegram alerts (launch set) | Telegram bot token | Next |
 | 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | |
 | 11 | Imports & reconciliation | CoinDCX read-only key (optional) | |
 | 12 | Extras & hardening | — | |
@@ -518,12 +518,18 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - Weekly GitHub backup now downloads the export from `/api/backup` (CRON_SECRET) and encrypts it with `scripts/encrypt-backup.mjs` (AES-256-GCM, scrypt key), so the file restores directly in the app
 - `lib/backup/crypto.mjs` is shared by the app and the workflow; round-trip, wrong-passphrase and tamper tests
 
-### Stage 8: Mutual funds
-- Migrations: `mf_schemes`, `mf_transactions`, `sips`, `mf_nav_history`, `mf_holdings` view
-- AMFI scheme list + nightly NAV sync
-- CAMS/KFintech CAS PDF import (Python `casparser` endpoint), manual entry, SIPs
-- Direct vs Regular flag, MF XIRR
-- **Done when:** all members' funds are imported and valued daily
+### Stage 8: Mutual funds ✅
+- **Manual entry instead of CAS PDF import** (decided when building). The `casparser` import can return in Stage 11 if typing entries gets tedious
+- Migration `20260915120000_mutual_funds.sql`: `mf_schemes` (AMFI code, name, fund house, category, Direct/Regular, Growth/IDCW, ISINs, latest and previous NAV) and `mf_transactions` (opening balance, purchase, SIP instalment, redemption; units, NAV, charges, folio). Owner RLS, grants for the secret-key role, `job_runs` accepts `mf-nav`, and `restore_family_data` restores fund entries
+- `lib/mutual-funds/parse-amfi`: parses AMFI's `NAVAll.txt` (checked against the real file: ~14,000 funds, blank Plan/Option on older funds, hundreds of option wordings, `-`/`Redeemed` ISINs, `10.` NAVs), tested with real lines
+- Settings → **Mutual fund list** downloads the file; `/api/cron/mf-nav` refreshes it on weekday nights (after AMFI publishes, by 11 PM). Funds missing from the file are marked inactive, never deleted. The previous NAV is kept for the latest change
+- Holdings reuse the FIFO engine (redemptions are sells), grouped by account + fund; a save or delete is refused if a redemption would exceed the units held
+- `lib/portfolio/xirr` (Newton with bisection fallback, tested against Excel's documented example); XIRR shown per fund, member and family once money has been invested for a year
+- Member page: Mutual funds card and fund entries; Mutual funds page: family totals, XIRR, every holding, and a note on Regular plans. Fund values count in family and member totals and daily snapshots; the NAV change isn't counted as "today"
+- Backup format version 2 adds fund entries (by AMFI code); version 1 files still restore
+- Long lists (transactions, fund entries) are read in pages past the 1,000-row API limit
+- No separate `sips` table or NAV history: SIP reminders move to Stage 12, NAV history to Stage 12 (charts)
+- **Done when:** every member's funds are entered and valued with the latest NAV
 
 ### Stage 9: Telegram alerts (launch set)
 - Migrations: `alert_rules`, `alert_events`, owner Telegram settings

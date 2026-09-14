@@ -6,6 +6,10 @@ export const JOBS = {
     label: "Daily snapshot",
     schedule: "Weekdays, between 4:30 and 5:30 PM India time",
   },
+  "mf-nav": {
+    label: "Mutual fund NAVs",
+    schedule: "Weekdays, between 11:30 PM and 12:30 AM India time",
+  },
   "stock-list": {
     label: "Stock list update",
     schedule: "Mondays, between 7:30 and 8:30 AM India time",

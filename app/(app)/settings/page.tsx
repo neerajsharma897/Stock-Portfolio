@@ -5,6 +5,7 @@ import { CircleAlertIcon, CircleCheckIcon } from "lucide-react"
 import { BackupCard } from "@/app/(app)/settings/backup-card"
 import { DeleteHolidayButton } from "@/app/(app)/settings/delete-holiday-button"
 import { HolidayForm } from "@/app/(app)/settings/holiday-form"
+import { UpdateFundListButton } from "@/app/(app)/settings/update-fund-list-button"
 import { UpdateStockListButton } from "@/app/(app)/settings/update-stock-list-button"
 import { ComingSoon } from "@/components/coming-soon"
 import { PageHeader } from "@/components/layout/page-header"
@@ -22,6 +23,7 @@ import {
   type StockListStatus,
 } from "@/lib/data/instruments"
 import { listLatestJobRuns, type JobRun } from "@/lib/data/jobs"
+import { getFundListStatus, type FundListStatus } from "@/lib/data/mutual-funds"
 import { todayInIndia } from "@/lib/dates"
 import { formatDate, formatQuantity } from "@/lib/format"
 import { JOB_NAMES, JOBS, type JobName } from "@/lib/jobs/names"
@@ -229,19 +231,26 @@ function HolidayList({ holidays }: { holidays: MarketHoliday[] }) {
 export default async function SettingsPage() {
   const user = await requireUser()
   const supabase = await createClient()
-  const [{ data: owner, error }, stockList, liveStatus, holidays, jobRuns] =
-    await Promise.all([
-      supabase
-        .from("app_owner")
-        .select("display_name, timezone, created_at")
-        .maybeSingle(),
-      attempt<StockListStatus>(getStockListStatus),
-      attempt<LiveStatus>(getLiveStatus),
-      attempt<MarketHoliday[]>(() =>
-        listMarketHolidays({ from: todayInIndia() }),
-      ),
-      attempt(listLatestJobRuns),
-    ])
+  const [
+    { data: owner, error },
+    stockList,
+    fundList,
+    liveStatus,
+    holidays,
+    jobRuns,
+  ] = await Promise.all([
+    supabase
+      .from("app_owner")
+      .select("display_name, timezone, created_at")
+      .maybeSingle(),
+    attempt<StockListStatus>(getStockListStatus),
+    attempt<FundListStatus>(getFundListStatus),
+    attempt<LiveStatus>(getLiveStatus),
+    attempt<MarketHoliday[]>(() =>
+      listMarketHolidays({ from: todayInIndia() }),
+    ),
+    attempt(listLatestJobRuns),
+  ])
 
   return (
     <>
@@ -343,6 +352,54 @@ export default async function SettingsPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Mutual fund list</CardTitle>
+            <CardDescription>
+              Every fund with its latest NAV from AMFI&apos;s public NAV file.
+              Used to pick funds and value them.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {"error" in fundList ? (
+              <StatusRow
+                ok={false}
+                label="Fund list unavailable"
+                detail={`Run the mutual funds migration (see README). ${fundList.error}`}
+              />
+            ) : (
+              <>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                  <dt className="text-muted-foreground">Open funds</dt>
+                  <dd>
+                    {fundList.value.count > 0
+                      ? formatQuantity(fundList.value.count)
+                      : "None yet"}
+                  </dd>
+                  <dt className="text-muted-foreground">Latest NAV date</dt>
+                  <dd>
+                    {fundList.value.latestNavDate
+                      ? formatDate(fundList.value.latestNavDate)
+                      : "—"}
+                  </dd>
+                  <dt className="text-muted-foreground">Last updated</dt>
+                  <dd>
+                    {fundList.value.lastUpdated
+                      ? formatDate(fundList.value.lastUpdated)
+                      : "Never"}
+                  </dd>
+                </dl>
+                <UpdateFundListButton hasList={fundList.value.count > 0} />
+                <p className="text-sm text-muted-foreground">
+                  {fundList.value.count > 0
+                    ? "NAVs update automatically every weekday night once the app is deployed, or update now."
+                    : "Download the list once before adding mutual funds. It takes under a minute."}
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Live prices</CardTitle>
             <CardDescription>
               Latest prices from Angel One SmartAPI. Without it, enter prices by
@@ -366,8 +423,8 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle>Scheduled jobs</CardTitle>
             <CardDescription>
-              Automatic tasks on the deployed site: daily portfolio snapshots
-              and the weekly stock list update.
+              Automatic tasks on the deployed site: daily portfolio snapshots,
+              nightly mutual fund NAVs and the weekly stock list update.
             </CardDescription>
           </CardHeader>
           <CardContent>

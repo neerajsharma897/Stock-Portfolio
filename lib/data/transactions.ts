@@ -5,6 +5,7 @@ import { z } from "zod"
 import { requireOwner } from "@/lib/auth"
 import type { TransactionForHolding } from "@/lib/portfolio/member-holdings"
 import type { Tables } from "@/lib/supabase/database.types"
+import { readAllRows } from "@/lib/supabase/read-all"
 import { createClient } from "@/lib/supabase/server"
 
 export type Transaction = Tables<"transactions">
@@ -52,15 +53,16 @@ export async function listMemberTransactions(
   if (!z.uuid().safeParse(memberId).success) return []
 
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("transactions")
-    .select(
-      "*, instrument:instruments(id, exchange, symbol, name, series, kind)",
-    )
-    .eq("member_id", memberId)
-    .order("trade_date", { ascending: false })
-    .order("created_at", { ascending: false })
-
-  if (error) throw new Error(`Couldn't load transactions: ${error.message}`)
-  return data
+  return readAllRows("transactions", (from, to) =>
+    supabase
+      .from("transactions")
+      .select(
+        "*, instrument:instruments(id, exchange, symbol, name, series, kind)",
+      )
+      .eq("member_id", memberId)
+      .order("trade_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  )
 }

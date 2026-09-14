@@ -1,8 +1,7 @@
-import { DeleteTransactionButton } from "@/app/(app)/members/[id]/delete-transaction-button"
-import {
-  TransactionDialog,
-  type StockAccount,
-} from "@/app/(app)/members/[id]/transaction-dialog"
+import { DeleteFundTransactionButton } from "@/app/(app)/members/[id]/delete-fund-transaction-button"
+import { FundTransactionDialog } from "@/app/(app)/members/[id]/fund-transaction-dialog"
+import type { StockAccount } from "@/app/(app)/members/[id]/transaction-dialog"
+import { FundName } from "@/components/fund-name"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -11,18 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import type { TransactionWithInstrument } from "@/lib/data/transactions"
+import type { FundTransactionWithScheme } from "@/lib/data/mutual-funds"
 import { formatDate, formatINR, formatQuantity } from "@/lib/format"
 import { brokerAccountName } from "@/lib/members/options"
-import { TRANSACTION_TYPE_LABELS } from "@/lib/transactions/options"
+import { MF_TRANSACTION_LABELS } from "@/lib/mutual-funds/options"
 
-const TYPE_BADGE = {
-  opening_balance: "secondary",
-  buy: "outline",
-  sell: "outline",
-} as const
-
-export function TransactionsCard({
+export function FundTransactionsCard({
   memberId,
   archived,
   accounts,
@@ -31,7 +24,7 @@ export function TransactionsCard({
   memberId: string
   archived: boolean
   accounts: StockAccount[]
-  transactions: TransactionWithInstrument[]
+  transactions: FundTransactionWithScheme[]
 }) {
   if (transactions.length === 0) return null
   const accountsById = new Map(accounts.map((account) => [account.id, account]))
@@ -39,7 +32,7 @@ export function TransactionsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Stock transactions</CardTitle>
+        <CardTitle>Mutual fund entries</CardTitle>
         <CardDescription>
           {transactions.length}{" "}
           {transactions.length === 1 ? "entry" : "entries"}, newest first.
@@ -47,7 +40,7 @@ export function TransactionsCard({
       </CardHeader>
       <CardContent>
         <div className="-mx-4 overflow-x-auto">
-          <table className="w-full min-w-[680px] text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th scope="col" className="px-4 py-2 font-medium">
@@ -57,13 +50,13 @@ export function TransactionsCard({
                   Type
                 </th>
                 <th scope="col" className="px-4 py-2 font-medium">
-                  Stock
+                  Fund
                 </th>
                 <th scope="col" className="px-4 py-2 text-right font-medium">
-                  Quantity
+                  Units
                 </th>
                 <th scope="col" className="px-4 py-2 text-right font-medium">
-                  Price
+                  NAV
                 </th>
                 <th scope="col" className="px-4 py-2 text-right font-medium">
                   Amount
@@ -77,12 +70,19 @@ export function TransactionsCard({
             </thead>
             <tbody className="divide-y">
               {transactions.map((transaction) => {
-                const quantity = Number(transaction.quantity)
-                const price = Number(transaction.price)
+                const units = Number(transaction.units)
+                const nav = Number(transaction.nav)
                 const charges = Number(transaction.charges)
                 const account = accountsById.get(transaction.broker_account_id)
-                const typeLabel = TRANSACTION_TYPE_LABELS[transaction.type]
-                const summary = `${typeLabel.toLowerCase()} of ${formatQuantity(quantity)} ${transaction.instrument.symbol} on ${formatDate(transaction.trade_date)}`
+                const typeLabel = MF_TRANSACTION_LABELS[transaction.type]
+                const summary = `${typeLabel.toLowerCase()} of ${formatQuantity(units)} units of ${transaction.scheme.name} on ${formatDate(transaction.trade_date)}`
+                const detail = [
+                  account && brokerAccountName(account),
+                  transaction.folio_number &&
+                    `Folio ${transaction.folio_number}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
 
                 return (
                   <tr key={transaction.id}>
@@ -90,27 +90,30 @@ export function TransactionsCard({
                       {formatDate(transaction.trade_date)}
                     </td>
                     <td className="px-4 py-2.5">
-                      <Badge variant={TYPE_BADGE[transaction.type]}>
+                      <Badge
+                        variant={
+                          transaction.type === "opening_balance"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
                         {typeLabel}
                       </Badge>
                     </td>
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium">
-                        {transaction.instrument.symbol}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {transaction.instrument.exchange}
-                        {account && ` · ${brokerAccountName(account)}`}
-                      </div>
+                    <td className="max-w-80 px-4 py-2.5">
+                      <FundName
+                        scheme={transaction.scheme}
+                        detail={detail || undefined}
+                      />
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
-                      {formatQuantity(quantity)}
+                      {formatQuantity(units)}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
-                      {formatINR(price)}
+                      {formatINR(nav, 4)}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
-                      {formatINR(quantity * price)}
+                      {formatINR(units * nav)}
                       {charges > 0 && (
                         <div className="text-xs text-muted-foreground">
                           + {formatINR(charges)} charges
@@ -120,27 +123,34 @@ export function TransactionsCard({
                     {!archived && (
                       <td className="px-4 py-2.5">
                         <div className="flex justify-end gap-1">
-                          <TransactionDialog
+                          <FundTransactionDialog
                             memberId={memberId}
                             accounts={accounts}
                             transaction={{
                               id: transaction.id,
                               type: transaction.type,
                               broker_account_id: transaction.broker_account_id,
-                              quantity,
-                              price,
+                              folio_number: transaction.folio_number,
+                              units,
+                              nav,
                               charges,
                               trade_date: transaction.trade_date,
                               notes: transaction.notes,
-                              instrument: {
-                                id: transaction.instrument.id,
-                                symbol: transaction.instrument.symbol,
-                                exchange: transaction.instrument.exchange,
-                                kind: transaction.instrument.kind,
+                              fund: {
+                                amfi_code: transaction.scheme.amfi_code,
+                                name: transaction.scheme.name,
+                                plan: transaction.scheme.plan,
+                                option_type: transaction.scheme.option_type,
+                                option_label: transaction.scheme.option_label,
+                                nav:
+                                  transaction.scheme.nav === null
+                                    ? null
+                                    : Number(transaction.scheme.nav),
+                                nav_date: transaction.scheme.nav_date,
                               },
                             }}
                           />
-                          <DeleteTransactionButton
+                          <DeleteFundTransactionButton
                             transactionId={transaction.id}
                             summary={summary}
                           />

@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest"
 
 import { encryptBackup } from "@/lib/backup/crypto.mjs"
 import { parseBackupText } from "@/lib/backup/parse"
-import { countBackup, stockRefs, type Backup } from "@/lib/backup/schema"
+import {
+  countBackup,
+  fundRefs,
+  stockRefs,
+  type Backup,
+} from "@/lib/backup/schema"
 
 const MEMBER_ID = "3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b"
 const ACCOUNT_ID = "4a2d3b5f-6c7e-4f80-9bac-1d2e3f4a5b6c"
@@ -10,7 +15,7 @@ const TIME = "2026-09-14T10:00:00+00:00"
 
 const backup: Backup = {
   app: "family-portfolio",
-  version: 1,
+  version: 2,
   exportedAt: TIME,
   members: [
     {
@@ -50,6 +55,23 @@ const backup: Backup = {
       price: 3200.5,
       charges: 0,
       trade_date: "2026-09-01",
+      notes: null,
+      created_at: TIME,
+      updated_at: TIME,
+    },
+  ],
+  mfTransactions: [
+    {
+      id: "6c4f5d7b-8e9a-4b02-9dce-3f4a5b6c7d8e",
+      member_id: MEMBER_ID,
+      broker_account_id: ACCOUNT_ID,
+      amfi_code: 122639,
+      folio_number: "12345678",
+      type: "sip",
+      units: 55.8231,
+      nav: 89.5712,
+      charges: 0.25,
+      trade_date: "2026-09-05",
       notes: null,
       created_at: TIME,
       updated_at: TIME,
@@ -103,6 +125,14 @@ describe("parseBackupText", () => {
     expect(() => parseBackupText(text, "guess")).toThrow("Wrong passphrase")
   })
 
+  it("reads a version 1 backup, which has no mutual fund entries", () => {
+    const versionOne: Partial<Backup> = { ...backup, version: 1 }
+    delete versionOne.mfTransactions
+    const result = parseBackupText(JSON.stringify(versionOne), null)
+    expect(result.backup.version).toBe(1)
+    expect(result.backup.mfTransactions).toEqual([])
+  })
+
   it("rejects files that aren't backups, pointing at the problem", () => {
     expect(() => parseBackupText("not json", null)).toThrow(
       "isn't a Family Portfolio backup",
@@ -124,6 +154,7 @@ describe("countBackup and stockRefs", () => {
       members: 1,
       brokerAccounts: 1,
       transactions: 1,
+      fundEntries: 1,
       prices: 1,
       holidays: 1,
       closingPrices: 1,
@@ -133,5 +164,6 @@ describe("countBackup and stockRefs", () => {
       { exchange: "NSE", token: "11536", symbol: "TCS" },
       { exchange: "BSE", token: "500325", symbol: "RELIANCE" },
     ])
+    expect(fundRefs(backup)).toEqual([122639])
   })
 })

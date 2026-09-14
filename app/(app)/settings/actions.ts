@@ -12,6 +12,7 @@ import { requireOwner } from "@/lib/auth"
 import { isValidIsoDate } from "@/lib/dates"
 import { formatDate, formatQuantity } from "@/lib/format"
 import { importInstruments } from "@/lib/instruments/import"
+import { importMutualFunds } from "@/lib/mutual-funds/import"
 import { createClient } from "@/lib/supabase/server"
 
 export async function updateStockList(): Promise<FormState> {
@@ -35,6 +36,29 @@ export async function updateStockList(): Promise<FormState> {
       error instanceof Error
         ? error.message
         : "Couldn't update the stock list.",
+    )
+  }
+}
+
+export async function updateFundList(): Promise<FormState> {
+  await requireOwner()
+
+  try {
+    const { funds, navsUpdated, deactivated } = await importMutualFunds(
+      await createClient(),
+    )
+    refresh()
+    const closed =
+      deactivated > 0
+        ? ` ${formatQuantity(deactivated)} closed funds were marked inactive.`
+        : ""
+    return {
+      status: "success",
+      message: `Fund list updated: ${formatQuantity(funds)} funds, ${formatQuantity(navsUpdated)} new NAVs.${closed}`,
+    }
+  } catch (error) {
+    return actionError(
+      error instanceof Error ? error.message : "Couldn't update the fund list.",
     )
   }
 }

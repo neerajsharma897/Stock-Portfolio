@@ -44,7 +44,7 @@ export default async function DashboardPage() {
             <p className="max-w-md text-sm text-muted-foreground">
               {members.length === 0
                 ? "Add each family member and their broker accounts first."
-                : "Open a member and add an opening balance for each stock they hold. Family totals will appear here."}
+                : "Open a member and add an opening balance for each stock or mutual fund they hold. Family totals will appear here."}
             </p>
             <Button asChild>
               <Link href="/members">Go to members</Link>
@@ -56,7 +56,9 @@ export default async function DashboardPage() {
   }
 
   const membersWithProblems = members.filter(
-    (memberPortfolio) => memberPortfolio.problems.length > 0,
+    (memberPortfolio) =>
+      memberPortfolio.problems.length > 0 ||
+      memberPortfolio.fundProblems.length > 0,
   )
 
   return (

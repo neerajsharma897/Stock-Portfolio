@@ -72,6 +72,8 @@ function roundQuantity(value: number) {
 
 export function buildPosition(
   transactions: readonly PositionTransaction[],
+  /** Word for a sell in error messages, e.g. "redemption" for mutual funds. */
+  { sellLabel = "sell" }: { sellLabel?: string } = {},
 ): PositionResult {
   const lots: Lot[] = []
   let realizedPnl = 0
@@ -94,7 +96,7 @@ export function buildPosition(
       return {
         ok: false,
         transactionId: transaction.id,
-        message: `The sell of ${roundQuantity(transaction.quantity)} on ${formatDate(transaction.tradeDate)} is more than the ${roundQuantity(held)} held on that date.`,
+        message: `The ${sellLabel} of ${roundQuantity(transaction.quantity)} on ${formatDate(transaction.tradeDate)} is more than the ${roundQuantity(held)} held on that date.`,
       }
     }
 

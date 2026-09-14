@@ -5,6 +5,8 @@ import { notFound } from "next/navigation"
 
 import { BrokerAccountDialog } from "@/app/(app)/members/[id]/broker-account-dialog"
 import { DeleteAccountButton } from "@/app/(app)/members/[id]/delete-account-button"
+import { FundTransactionsCard } from "@/app/(app)/members/[id]/fund-transactions-card"
+import { FundsCard } from "@/app/(app)/members/[id]/funds-card"
 import { HoldingsCard } from "@/app/(app)/members/[id]/holdings-card"
 import { MemberStatusActions } from "@/app/(app)/members/[id]/member-status-actions"
 import { TransactionsCard } from "@/app/(app)/members/[id]/transactions-card"
@@ -22,12 +24,23 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getMember } from "@/lib/data/members"
+import {
+  listMemberFundTransactions,
+  toFundHoldingTransaction,
+  toFundNav,
+} from "@/lib/data/mutual-funds"
 import { listPrices } from "@/lib/data/prices"
 import {
   listMemberTransactions,
   toHoldingTransaction,
 } from "@/lib/data/transactions"
 import { BROKER_LABELS, RELATION_LABELS } from "@/lib/members/options"
+import {
+  combinedReturn,
+  forFamilyTotals,
+  groupFundHoldings,
+  valueFund,
+} from "@/lib/mutual-funds/portfolio"
 import { groupHoldings } from "@/lib/portfolio/member-holdings"
 import {
   buildPriceItems,
@@ -58,8 +71,9 @@ export default async function MemberPage({
     (account) => account.broker !== "coindcx",
   )
 
-  const [transactions, liveStatus] = await Promise.all([
+  const [transactions, fundTransactions, liveStatus] = await Promise.all([
     listMemberTransactions(member.id),
+    listMemberFundTransactions(member.id),
     getLiveStatus(),
   ])
   const instruments = new Map(
@@ -75,7 +89,21 @@ export default async function MemberPage({
   const valued = holdings.map((holding) =>
     valueHolding(holding, prices.get(holding.instrumentId) ?? null),
   )
-  const summary = summarize(valued)
+  const hasStocks = valued.some((holding) => holding.position.quantity > 0)
+
+  const schemes = new Map(
+    fundTransactions.map((transaction) => [
+      transaction.amfi_code,
+      transaction.scheme,
+    ]),
+  )
+  const { holdings: fundHoldings, problems: fundProblems } = groupFundHoldings(
+    fundTransactions.map(toFundHoldingTransaction),
+  )
+  const funds = fundHoldings.map((holding) =>
+    valueFund(holding, toFundNav(schemes.get(holding.amfiCode))),
+  )
+  const summary = summarize([...valued, ...forFamilyTotals(funds)])
 
   return (
     <div className="grid gap-2">
@@ -103,9 +131,7 @@ export default async function MemberPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {summary.holdingCount > 0 && (
-            <LivePrices initialStatus={liveStatus} />
-          )}
+          {hasStocks && <LivePrices initialStatus={liveStatus} />}
           {!archived && <MemberFormDialog member={member} />}
           <MemberStatusActions
             memberId={member.id}
@@ -142,11 +168,29 @@ export default async function MemberPage({
         priceItems={buildPriceItems(valued, instruments)}
       />
 
+      <FundsCard
+        memberId={member.id}
+        memberName={member.name}
+        archived={archived}
+        accounts={stockAccounts}
+        funds={funds}
+        problems={fundProblems}
+        schemes={schemes}
+        xirr={combinedReturn(funds)}
+      />
+
       <TransactionsCard
         memberId={member.id}
         archived={archived}
         accounts={stockAccounts}
         transactions={transactions}
+      />
+
+      <FundTransactionsCard
+        memberId={member.id}
+        archived={archived}
+        accounts={stockAccounts}
+        transactions={fundTransactions}
       />
 
       <Card>

@@ -6,6 +6,10 @@
       "schedule": "0 11 * * 1-5"
     },
     {
+      "path": "/api/cron/mf-nav",
+      "schedule": "0 18 * * 1-5"
+    },
+    {
       "path": "/api/cron/stock-list",
       "schedule": "0 2 * * 1"
     }

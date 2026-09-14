@@ -1,28 +1,8 @@
 import "server-only"
 
 import { BACKUP_APP, BACKUP_VERSION, type Backup } from "@/lib/backup/schema"
+import { readAllRows } from "@/lib/supabase/read-all"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
-
-// Supabase's API returns at most 1,000 rows per request.
-const PAGE_SIZE = 1000
-
-type Page<T> = PromiseLike<{
-  data: T[] | null
-  error: { message: string } | null
-}>
-
-async function readAll<T>(
-  label: string,
-  fetchPage: (from: number, to: number) => Page<T>,
-): Promise<T[]> {
-  const rows: T[] = []
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await fetchPage(from, from + PAGE_SIZE - 1)
-    if (error) throw new Error(`Couldn't export ${label}: ${error.message}`)
-    rows.push(...(data ?? []))
-    if (!data || data.length < PAGE_SIZE) return rows
-  }
-}
 
 type StockRow = {
   instrument: { exchange: "NSE" | "BSE"; token: string; symbol: string }
@@ -50,12 +30,13 @@ export async function buildBackup(
     members,
     brokerAccounts,
     transactions,
+    mfTransactions,
     instrumentPrices,
     marketHolidays,
     eodPrices,
     portfolioSnapshots,
   ] = await Promise.all([
-    readAll("members", (from, to) =>
+    readAllRows("members", (from, to) =>
       supabase
         .from("members")
         .select(
@@ -64,7 +45,7 @@ export async function buildBackup(
         .order("id")
         .range(from, to),
     ),
-    readAll("broker accounts", (from, to) =>
+    readAllRows("broker accounts", (from, to) =>
       supabase
         .from("broker_accounts")
         .select(
@@ -73,7 +54,7 @@ export async function buildBackup(
         .order("id")
         .range(from, to),
     ),
-    readAll("transactions", (from, to) =>
+    readAllRows("transactions", (from, to) =>
       supabase
         .from("transactions")
         .select(
@@ -82,7 +63,16 @@ export async function buildBackup(
         .order("id")
         .range(from, to),
     ),
-    readAll("prices", (from, to) =>
+    readAllRows("mutual fund entries", (from, to) =>
+      supabase
+        .from("mf_transactions")
+        .select(
+          "id, member_id, broker_account_id, amfi_code, folio_number, type, units, nav, charges, trade_date, notes, created_at, updated_at",
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    readAllRows("prices", (from, to) =>
       supabase
         .from("instrument_prices")
         .select(
@@ -91,14 +81,14 @@ export async function buildBackup(
         .order("instrument_id")
         .range(from, to),
     ),
-    readAll("holidays", (from, to) =>
+    readAllRows("holidays", (from, to) =>
       supabase
         .from("market_holidays")
         .select("holiday_date, description, created_at")
         .order("holiday_date")
         .range(from, to),
     ),
-    readAll("closing prices", (from, to) =>
+    readAllRows("closing prices", (from, to) =>
       supabase
         .from("eod_prices")
         .select(
@@ -108,7 +98,7 @@ export async function buildBackup(
         .order("price_date")
         .range(from, to),
     ),
-    readAll("snapshots", (from, to) =>
+    readAllRows("snapshots", (from, to) =>
       supabase
         .from("portfolio_snapshots")
         .select(
@@ -127,6 +117,7 @@ export async function buildBackup(
     members,
     brokerAccounts,
     transactions: transactions.map(withStockRef),
+    mfTransactions,
     instrumentPrices: instrumentPrices.map(withStockRef),
     marketHolidays,
     eodPrices: eodPrices.map(withStockRef),

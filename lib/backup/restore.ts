@@ -1,7 +1,7 @@
 import "server-only"
 
 import { MAX_BACKUP_BYTES, parseBackupText } from "@/lib/backup/parse"
-import { stockRefs, type Backup } from "@/lib/backup/schema"
+import { fundRefs, stockRefs, type Backup } from "@/lib/backup/schema"
 import type { Json } from "@/lib/supabase/database.types"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
@@ -44,6 +44,26 @@ export async function findMissingStocks(
   }
 
   return refs.filter((ref) => !known.has(`${ref.exchange}:${ref.token}`))
+}
+
+/** AMFI codes the backup refers to that aren't in this database's fund list. */
+export async function findMissingFunds(
+  supabase: AppSupabaseClient,
+  backup: Backup,
+): Promise<number[]> {
+  const codes = fundRefs(backup)
+  const known = new Set<number>()
+
+  for (let start = 0; start < codes.length; start += TOKEN_CHUNK) {
+    const { data, error } = await supabase
+      .from("mf_schemes")
+      .select("amfi_code")
+      .in("amfi_code", codes.slice(start, start + TOKEN_CHUNK))
+    if (error) throw new Error(`Couldn't check the fund list: ${error.message}`)
+    for (const row of data) known.add(row.amfi_code)
+  }
+
+  return codes.filter((code) => !known.has(code))
 }
 
 /** Replaces all family data with the backup, in one database transaction. */
