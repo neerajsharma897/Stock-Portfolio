@@ -92,40 +92,46 @@
   --sidebar-ring: #3f5bd9;
 }
 
+/*
+ * Dark mode measured from Angel One's web app: near-black cards on a slightly
+ * lighter page, #262626 borders, #667fff blue, teal gains and coral losses.
+ * Text on blue is near-black and the active-item blue is lightened so text
+ * meets WCAG AA contrast.
+ */
 .dark {
-  --background: #0e1524;
-  --foreground: #e6eaf2;
-  --card: #161f31;
-  --card-foreground: #e6eaf2;
-  --popover: #1b2539;
-  --popover-foreground: #e6eaf2;
-  --primary: #7b90f5;
-  --primary-foreground: #0e1524;
-  --secondary: #1f2a40;
-  --secondary-foreground: #e6eaf2;
-  --muted: #1c2638;
-  --muted-foreground: #9aa5b8;
-  --accent: #1f2a4d;
-  --accent-foreground: #a9b6fb;
-  --destructive: #f87171;
-  --border: #283349;
-  --input: #323e56;
-  --ring: #7b90f5;
-  --gain: #4ade80;
-  --loss: #f87171;
-  --chart-1: #7b90f5;
+  --background: #181818;
+  --foreground: #f0f0f0;
+  --card: #0d0d0d;
+  --card-foreground: #f0f0f0;
+  --popover: #1a1a1a;
+  --popover-foreground: #f0f0f0;
+  --primary: #667fff;
+  --primary-foreground: #0d0d0d;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #f0f0f0;
+  --muted: #1a1a1a;
+  --muted-foreground: #a8a8a8;
+  --accent: #1c2533;
+  --accent-foreground: #8c9dff;
+  --destructive: #fa6464;
+  --border: #262626;
+  --input: #2e2e2e;
+  --ring: #667fff;
+  --gain: #3fb0a5;
+  --loss: #fa6464;
+  --chart-1: #667fff;
   --chart-2: #38bdf8;
-  --chart-3: #6ccf73;
+  --chart-3: #3fb0a5;
   --chart-4: #ff9a3d;
   --chart-5: #a78bfa;
-  --sidebar: #161f31;
-  --sidebar-foreground: #e6eaf2;
-  --sidebar-primary: #7b90f5;
-  --sidebar-primary-foreground: #0e1524;
-  --sidebar-accent: #1f2a4d;
-  --sidebar-accent-foreground: #a9b6fb;
-  --sidebar-border: #283349;
-  --sidebar-ring: #7b90f5;
+  --sidebar: #0d0d0d;
+  --sidebar-foreground: #f0f0f0;
+  --sidebar-primary: #667fff;
+  --sidebar-primary-foreground: #0d0d0d;
+  --sidebar-accent: #1c2533;
+  --sidebar-accent-foreground: #8c9dff;
+  --sidebar-border: #262626;
+  --sidebar-ring: #667fff;
 }
 
 @layer base {

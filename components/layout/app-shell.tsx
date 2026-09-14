@@ -3,6 +3,10 @@ import { MobileNav } from "@/components/layout/mobile-nav"
 import { NavLinks } from "@/components/layout/nav-links"
 import { UserMenu } from "@/components/layout/user-menu"
 
+/**
+ * Angel One-style layout: a full-width top bar, then floating rounded panels
+ * on the page background with an 8px gutter between everything.
+ */
 export function AppShell({
   email,
   children,
@@ -11,25 +15,21 @@ export function AppShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-svh">
-      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 md:flex">
+    <div className="min-h-svh bg-background">
+      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-card px-4 dark:border-b-0">
+        <MobileNav />
         <Brand />
-        <NavLinks />
-      </aside>
+        <div className="flex-1" />
+        <UserMenu email={email} />
+      </header>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-card/95 px-4 backdrop-blur supports-backdrop-filter:bg-card/80 md:px-8">
-          <MobileNav />
-          <div className="md:hidden">
-            <Brand />
-          </div>
-          <div className="flex-1" />
-          <UserMenu email={email} />
-        </header>
+      <div className="flex gap-2 p-2">
+        {/* Sticks 8px below the 56px top bar and stops 8px above the bottom. */}
+        <aside className="sticky top-16 hidden h-[calc(100svh-4.5rem)] w-56 shrink-0 flex-col rounded-xl bg-sidebar p-2 ring-1 ring-border md:flex dark:ring-0">
+          <NavLinks />
+        </aside>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8">
-          {children}
-        </main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   )

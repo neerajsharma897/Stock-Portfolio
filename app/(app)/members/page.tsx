@@ -87,7 +87,7 @@ export default async function MembersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {active.map((member) => (
             <MemberCard key={member.id} member={member} />
           ))}
@@ -95,17 +95,14 @@ export default async function MembersPage() {
       )}
 
       {archived.length > 0 && (
-        <section
-          className="mt-10 grid gap-3"
-          aria-labelledby="archived-heading"
-        >
+        <section className="mt-4 grid gap-2" aria-labelledby="archived-heading">
           <h2
             id="archived-heading"
             className="text-sm font-medium text-muted-foreground"
           >
             Archived
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {archived.map((member) => (
               <MemberCard key={member.id} member={member} />
             ))}

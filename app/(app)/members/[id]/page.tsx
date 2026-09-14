@@ -78,21 +78,20 @@ export default async function MemberPage({
   const summary = summarize(valued)
 
   return (
-    <>
-      <Link
-        href="/members"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeftIcon className="size-4" aria-hidden />
-        Members
-      </Link>
-
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card p-4 ring-1 ring-border">
         <div className="flex min-w-0 items-center gap-4">
+          <Link
+            href="/members"
+            aria-label="Back to members"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ChevronLeftIcon className="size-4" aria-hidden />
+          </Link>
           <MemberAvatar name={member.name} color={member.color} size="lg" />
           <div className="grid min-w-0 gap-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-semibold tracking-tight">
+              <h1 className="truncate text-xl font-semibold tracking-tight">
                 {member.name}
               </h1>
               {archived && <Badge variant="secondary">Archived</Badge>}
@@ -103,7 +102,10 @@ export default async function MemberPage({
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {summary.holdingCount > 0 && (
+            <LivePrices initialStatus={liveStatus} />
+          )}
           {!archived && <MemberFormDialog member={member} />}
           <MemberStatusActions
             memberId={member.id}
@@ -115,108 +117,99 @@ export default async function MemberPage({
       </div>
 
       {archived && (
-        <p className="mb-6 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
           {member.name} is archived: hidden from the members list and from
           family totals. Restore to make changes.
         </p>
       )}
 
       {member.notes && (
-        <p className="mb-6 text-sm whitespace-pre-line text-muted-foreground">
+        <p className="rounded-xl bg-card px-4 py-3 text-sm whitespace-pre-line text-muted-foreground ring-1 ring-border">
           {member.notes}
         </p>
       )}
 
-      <div className="grid gap-4">
-        {summary.holdingCount > 0 && (
-          <>
-            <div className="flex justify-end">
-              <LivePrices initialStatus={liveStatus} />
-            </div>
-            <PortfolioSummaryTiles summary={summary} />
-          </>
-        )}
+      {summary.holdingCount > 0 && <PortfolioSummaryTiles summary={summary} />}
 
-        <HoldingsCard
-          memberId={member.id}
-          memberName={member.name}
-          archived={archived}
-          accounts={stockAccounts}
-          holdings={valued}
-          problems={problems}
-          instruments={instruments}
-          priceItems={buildPriceItems(valued, instruments)}
-        />
+      <HoldingsCard
+        memberId={member.id}
+        memberName={member.name}
+        archived={archived}
+        accounts={stockAccounts}
+        holdings={valued}
+        problems={problems}
+        instruments={instruments}
+        priceItems={buildPriceItems(valued, instruments)}
+      />
 
-        <TransactionsCard
-          memberId={member.id}
-          archived={archived}
-          accounts={stockAccounts}
-          transactions={transactions}
-        />
+      <TransactionsCard
+        memberId={member.id}
+        archived={archived}
+        accounts={stockAccounts}
+        transactions={transactions}
+      />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Accounts</CardTitle>
-            <CardDescription>
-              Broker and exchange accounts {member.name} holds.
-            </CardDescription>
-            {!archived && (
-              <CardAction>
-                <BrokerAccountDialog memberId={member.id} />
-              </CardAction>
-            )}
-          </CardHeader>
-          <CardContent>
-            {accounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No accounts linked yet.
-                {!archived && " Add each broker or exchange they use."}
-              </p>
-            ) : (
-              <ul className="divide-y">
-                {accounts.map((account) => (
-                  <li
-                    key={account.id}
-                    className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                  >
-                    <div className="grid min-w-0 gap-0.5">
-                      <p className="font-medium">
-                        {BROKER_LABELS[account.broker]}
-                        {account.label && (
-                          <span className="font-normal text-muted-foreground">
-                            {" "}
-                            · {account.label}
-                          </span>
-                        )}
-                      </p>
-                      <p className="truncate text-sm text-muted-foreground">
-                        {account.client_id_last4
-                          ? `Client ID ending ${account.client_id_last4}`
-                          : "No client ID saved"}
-                        {account.notes && ` · ${account.notes}`}
-                      </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Accounts</CardTitle>
+          <CardDescription>
+            Broker and exchange accounts {member.name} holds.
+          </CardDescription>
+          {!archived && (
+            <CardAction>
+              <BrokerAccountDialog memberId={member.id} />
+            </CardAction>
+          )}
+        </CardHeader>
+        <CardContent>
+          {accounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No accounts linked yet.
+              {!archived && " Add each broker or exchange they use."}
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {accounts.map((account) => (
+                <li
+                  key={account.id}
+                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="grid min-w-0 gap-0.5">
+                    <p className="font-medium">
+                      {BROKER_LABELS[account.broker]}
+                      {account.label && (
+                        <span className="font-normal text-muted-foreground">
+                          {" "}
+                          · {account.label}
+                        </span>
+                      )}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {account.client_id_last4
+                        ? `Client ID ending ${account.client_id_last4}`
+                        : "No client ID saved"}
+                      {account.notes && ` · ${account.notes}`}
+                    </p>
+                  </div>
+                  {!archived && (
+                    <div className="flex shrink-0 gap-1">
+                      <BrokerAccountDialog
+                        memberId={member.id}
+                        account={account}
+                      />
+                      <DeleteAccountButton
+                        accountId={account.id}
+                        broker={account.broker}
+                        label={account.label}
+                      />
                     </div>
-                    {!archived && (
-                      <div className="flex shrink-0 gap-1">
-                        <BrokerAccountDialog
-                          memberId={member.id}
-                          account={account}
-                        />
-                        <DeleteAccountButton
-                          accountId={account.id}
-                          broker={account.broker}
-                          label={account.label}
-                        />
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

@@ -247,7 +247,7 @@ export default async function SettingsPage() {
     <>
       <PageHeader title="Settings" description="Account and setup status." />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-2 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Account</CardTitle>
@@ -421,7 +421,7 @@ export default async function SettingsPage() {
         </Card>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-2">
         <ComingSoon
           stage={9}
           title="Telegram settings"

@@ -74,7 +74,7 @@ export default async function DashboardPage() {
       {membersWithProblems.length > 0 && (
         <div
           role="alert"
-          className="mb-4 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          className="mb-2 flex gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm"
         >
           <TriangleAlertIcon
             className="mt-0.5 size-4 shrink-0 text-destructive"
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
 
       <PortfolioSummaryTiles summary={summary} />
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+      <div className="mt-2 grid gap-2 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <MemberSplit members={members} familyValue={summary.currentValue} />
         </div>
