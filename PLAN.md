@@ -430,9 +430,9 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 
 | Stage | Name | Needs keys / accounts | Status |
 |---|---|---|---|
-| 1 | Foundation | Supabase project (only to log in) | ✅ Built |
-| 2 | Members & broker accounts | — | Next |
-| 3 | Stock list & search | — (public Angel One instrument file) | |
+| 1 | Foundation | Supabase project (only to log in) | ✅ Done |
+| 2 | Members & broker accounts | — | ✅ Built |
+| 3 | Stock list & search | — (public Angel One instrument file) | Next |
 | 4 | Transactions & holdings engine | — | |
 | 5 | Dashboard & member portfolio pages | — | |
 | 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | |
@@ -453,11 +453,12 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - `lib/format.ts` (₹ lakh/crore, %, IST dates) and `lib/redirect.ts` with unit tests
 - **Done when:** `npm run lint`, `typecheck`, `test` and `build` pass; Dad can sign in and Settings shows all checks green
 
-### Stage 2: Members & broker accounts
-- Migration: `members`, `broker_accounts` with owner-only RLS
-- Members list, add/edit/archive member (name, relation, colour, PAN last 4)
-- Link broker accounts per member (Angel One, Zerodha, Groww, Upstox, 5paisa, CoinDCX)
-- Member detail page shell (tabs filled in later stages)
+### Stage 2: Members & broker accounts ✅
+- Migration `20260914130000_members.sql`: `members`, `broker_accounts`, enums, owner-only RLS
+- Members list, add/edit/archive/restore member (name, relation, colour, PAN last 4); delete only after archiving
+- Link broker accounts per member (Angel One, Zerodha, Groww, Upstox, 5paisa, CoinDCX, Other)
+- Member detail page with accounts; holdings placeholder for Stage 4
+- Owner-only gate on every signed-in page and Server Action
 - **Done when:** the 5 family members and their accounts are saved and editable
 
 ### Stage 3: Stock list & search

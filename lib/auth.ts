@@ -25,3 +25,19 @@ export async function requireUser(): Promise<CurrentUser> {
   if (!user) redirect("/login")
   return user
 }
+
+/** Whether the signed-in user is the app owner (see public.is_owner()). Memoized per render. */
+export const isOwner = cache(async (): Promise<boolean> => {
+  if (!supabaseEnv) return false
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("is_owner")
+  return !error && data === true
+})
+
+/** Use in every Server Action and data loader that reads or changes family data. */
+export async function requireOwner(): Promise<CurrentUser> {
+  const user = await requireUser()
+  if (!(await isOwner())) throw new Error("Only the app owner can do this.")
+  return user
+}
