@@ -392,6 +392,7 @@ export type Database = {
     Views: { [_ in never]: never }
     Functions: {
       is_owner: { Args: never; Returns: boolean }
+      restore_family_data: { Args: { backup: Json }; Returns: Json }
     }
     Enums: {
       broker:

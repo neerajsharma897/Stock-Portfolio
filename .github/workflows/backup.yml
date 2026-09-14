@@ -1,6 +1,6 @@
-# Weekly encrypted backup of the app's data (the public schema).
-# Needs two repository secrets: SUPABASE_DB_URL and BACKUP_PASSPHRASE (see README).
-name: Weekly database backup
+# Weekly encrypted backup of the app's data, restorable in Settings → Backup & restore.
+# Needs three repository secrets: BACKUP_URL, CRON_SECRET and BACKUP_PASSPHRASE (see README).
+name: Weekly backup
 
 on:
   schedule:
@@ -13,28 +13,33 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Dump, compress and encrypt the database
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download the export and encrypt it
         shell: bash
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_URL: ${{ secrets.BACKUP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           set -euo pipefail
-          if [ -z "${SUPABASE_DB_URL}" ] || [ -z "${BACKUP_PASSPHRASE}" ]; then
-            echo "::error::Add the SUPABASE_DB_URL and BACKUP_PASSPHRASE repository secrets (see README)."
+          if [ -z "${BACKUP_URL}" ] || [ -z "${CRON_SECRET}" ] || [ -z "${BACKUP_PASSPHRASE}" ]; then
+            echo "::error::Add the BACKUP_URL, CRON_SECRET and BACKUP_PASSPHRASE repository secrets (see README)."
             exit 1
           fi
 
-          file="family-portfolio-$(date -u +%Y-%m-%d).sql.gz.gpg"
-          # pg_dump from the official Postgres 17 image, so it's never older than the database.
-          docker run --rm -e PGURL="${SUPABASE_DB_URL}" postgres:17 \
-            sh -c 'pg_dump "$PGURL" --schema=public --no-owner' \
-            | gzip \
-            | gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
-                --passphrase-file <(printf '%s' "${BACKUP_PASSPHRASE}") \
-                --output "${file}"
+          file="family-portfolio-$(date -u +%Y-%m-%d).backup.json"
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${BACKUP_URL%/}/api/backup" -o export.json
+          node scripts/encrypt-backup.mjs < export.json > "${file}"
+          rm export.json
           echo "BACKUP_FILE=${file}" >> "${GITHUB_ENV}"
 
       - name: Keep the encrypted backup for 90 days

@@ -26,9 +26,11 @@ function redirectWithCookies(url: URL, from: NextResponse) {
 
 // Optimistic auth check only. Pages and Server Actions still call requireUser().
 export async function proxy(request: NextRequest) {
-  // Scheduled jobs have no session: their routes check CRON_SECRET instead.
-  // (Cron requests don't follow redirects, so a login redirect would skip the job.)
-  if (request.nextUrl.pathname.startsWith("/api/cron/")) {
+  // Scheduled jobs and the GitHub backup have no session: their routes check
+  // CRON_SECRET instead. (Cron requests don't follow redirects, so a login
+  // redirect would skip the job.)
+  const { pathname: requestPath } = request.nextUrl
+  if (requestPath.startsWith("/api/cron/") || requestPath === "/api/backup") {
     return NextResponse.next()
   }
 

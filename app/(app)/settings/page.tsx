@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { unstable_rethrow } from "next/navigation"
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react"
 
+import { BackupCard } from "@/app/(app)/settings/backup-card"
 import { DeleteHolidayButton } from "@/app/(app)/settings/delete-holiday-button"
 import { HolidayForm } from "@/app/(app)/settings/holiday-form"
 import { UpdateStockListButton } from "@/app/(app)/settings/update-stock-list-button"
@@ -379,6 +380,19 @@ export default async function SettingsPage() {
             ) : (
               <JobsCard runs={jobRuns.value} />
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Backup &amp; restore</CardTitle>
+            <CardDescription>
+              Download a copy of your data, or put a backup back after a mistake
+              or when moving to a new database.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BackupCard />
           </CardContent>
         </Card>
 

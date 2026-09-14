@@ -73,7 +73,9 @@ and member pages refresh prices every 5 seconds. Outside market hours prices are
 
 ## Deploying to Vercel (Stage 7)
 
-1. **Run the migration** `supabase/migrations/20260914170000_scheduled_jobs.sql` in the Supabase SQL Editor.
+1. **Run the migrations** `supabase/migrations/20260914170000_scheduled_jobs.sql` and then
+   `supabase/migrations/20260915090000_service_role_grants.sql` in the Supabase SQL Editor.
+   The second lets scheduled jobs read and write the tables; without it they fail with "permission denied".
 2. **Push the code to a private GitHub repository.**
 3. **Import the repository in Vercel:** vercel.com → Add New → Project → pick the repository. Vercel detects Next.js.
 4. **Add environment variables** (Vercel → Project → Settings → Environment Variables), then redeploy:
@@ -103,19 +105,29 @@ Defined in `vercel.json`. Times are UTC; on Vercel's free plan each job runs onc
 
 Vercel may occasionally skip or repeat a run; both jobs are safe to run again.
 
-### Weekly encrypted backups
+### Backups, export and restore
 
-`.github/workflows/backup.yml` runs every Sunday at 2 AM India time (or on demand from the repository's **Actions** tab).
-It dumps the app's data, encrypts it with your passphrase and keeps the file for 90 days as a workflow artifact.
+Run `supabase/migrations/20260915100000_backup_restore.sql` first.
+
+**Download data** (Settings → Backup & restore) saves everything you've entered as one JSON file: members, accounts,
+transactions, prices, holidays and daily history. The stock list isn't included (download it again from Settings) and
+neither is the sign-in account. The file isn't encrypted, so keep it somewhere private.
+
+**Weekly encrypted backup:** `.github/workflows/backup.yml` runs every Sunday at 2 AM India time (or on demand from the
+repository's **Actions** tab). It downloads the same export from the live site, encrypts it with your passphrase
+(AES-256-GCM) and keeps it for 90 days as a workflow artifact.
 
 1. GitHub → repository → Settings → Secrets and variables → Actions → **New repository secret**:
-   - `SUPABASE_DB_URL`: Supabase → **Connect** → **Session pooler** connection string, with the database password filled in.
-     The direct connection doesn't work from GitHub's servers.
-   - `BACKUP_PASSPHRASE`: a long passphrase. **Keep a copy somewhere safe: backups can't be opened without it.**
-2. Run the workflow once from the Actions tab and check a backup file appears.
+   - `BACKUP_URL`: the live site address, e.g. `https://portfolio.dks189.vercel.app`
+   - `CRON_SECRET`: the same value as in Vercel
+   - `BACKUP_PASSPHRASE`: a long passphrase. **Keep a copy somewhere safe: encrypted backups can't be restored without it.**
+2. Run the workflow once from the Actions tab and check an artifact appears.
+3. If you added `SUPABASE_DB_URL` earlier, delete it; it's no longer used.
 
-To open a backup: `gpg --decrypt family-portfolio-YYYY-MM-DD.sql.gz.gpg | gunzip > backup.sql`.
-Restoring into Supabase needs care (the sign-in account lives in Supabase Auth, not in the backup), so plan it before you need it.
+**Restore:** Settings → Backup & restore → choose a downloaded export or a backup file (GitHub downloads artifacts as a
+.zip, so unzip it first) → enter the passphrase if it's encrypted → **Check file** shows what's inside → **Replace all data**.
+Restoring replaces everything with the file's contents in one database transaction: if anything fails, nothing changes.
+Download the stock list first, since stocks are matched by exchange and code.
 
 ## Scripts
 

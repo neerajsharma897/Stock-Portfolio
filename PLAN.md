@@ -437,6 +437,7 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 5 | Dashboard & member portfolio pages | — | ✅ Built |
 | 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | ✅ Built |
 | 7 | Deployment & scheduled jobs | Vercel | ✅ Built |
+| 7b | Export & restore | — | ✅ Built |
 | 8 | Mutual funds | — (AMFI is public) | Next |
 | 9 | Telegram alerts (launch set) | Telegram bot token | |
 | 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | |
@@ -505,9 +506,17 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - `/api/cron/stock-list` (Mondays before open): refreshes the stock list
 - Cron routes check `CRON_SECRET` (constant-time) and are exempt from the login redirect; jobs use a server-only admin Supabase client
 - Settings shows the latest run of each job; security headers in `next.config.ts`
-- Weekly encrypted backup: GitHub Action (`pg_dump` → gzip → GPG AES-256) kept as a 90-day artifact
+- Weekly encrypted backup: GitHub Action kept as a 90-day artifact (reworked in Stage 7b so it can be restored in the app)
+- Fix migration `20260915090000_service_role_grants.sql`: table privileges for the secret-key role used by jobs
 - Angel One sessions stay in memory per server instance; on Vercel a cold start means a fresh login, which is within SmartAPI's limits for one user
 - **Done when:** Dad uses it from his phone and daily jobs run on their own
+
+### Stage 7b: Export & restore ✅
+- **Download data** (`GET /api/export`, owner only): one JSON file with members, accounts, transactions, prices, holidays, closing prices and snapshots. Stocks are referenced by exchange + Angel One token; paged past the 1,000-row API limit
+- **Restore** in Settings: upload a plain export or an encrypted backup (+ passphrase) → **Check file** previews counts and checks every stock exists → confirm → `restore_family_data` replaces all family data in one database transaction (owner only; nothing changes on error)
+- Migration `20260915100000_backup_restore.sql`: the restore function, and read access to broker accounts for the backup
+- Weekly GitHub backup now downloads the export from `/api/backup` (CRON_SECRET) and encrypts it with `scripts/encrypt-backup.mjs` (AES-256-GCM, scrypt key), so the file restores directly in the app
+- `lib/backup/crypto.mjs` is shared by the app and the workflow; round-trip, wrong-passphrase and tamper tests
 
 ### Stage 8: Mutual funds
 - Migrations: `mf_schemes`, `mf_transactions`, `sips`, `mf_nav_history`, `mf_holdings` view

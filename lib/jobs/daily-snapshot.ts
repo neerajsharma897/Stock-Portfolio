@@ -30,11 +30,17 @@ export async function runDailySnapshot(
   if (market.reason === "holiday") {
     return { status: "skipped", summary: `Market holiday: ${market.holiday}.` }
   }
-  if (market.reason !== "after_close") {
+  if (market.reason === "before_open") {
     return {
       status: "skipped",
       summary:
-        "The market hasn't closed yet today; the snapshot runs after 3:30 PM.",
+        "The market hasn't opened yet today; the snapshot runs after 3:30 PM.",
+    }
+  }
+  if (market.reason !== "after_close") {
+    return {
+      status: "skipped",
+      summary: "The market is still open; the snapshot runs after 3:30 PM.",
     }
   }
 

@@ -19,6 +19,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  experimental: {
+    serverActions: {
+      // Restoring a backup uploads the file through a Server Action (default limit 1 MB).
+      // Matches Vercel's 4.5 MB request limit; backups over 4 MB are rejected with a message.
+      bodySizeLimit: "4.5mb",
+    },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }]
   },
