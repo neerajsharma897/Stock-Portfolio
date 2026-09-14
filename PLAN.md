@@ -434,8 +434,8 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 2 | Members & broker accounts | — | ✅ Built |
 | 3 | Stock list & search | — (public Angel One instrument file) | ✅ Built (with 4) |
 | 4 | Transactions & holdings engine | — | ✅ Built |
-| 5 | Dashboard & member portfolio pages | — | Next |
-| 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | |
+| 5 | Dashboard & member portfolio pages | — | ✅ Built |
+| 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | Next |
 | 7 | Deployment & scheduled jobs | Vercel | |
 | 8 | Mutual funds | — (AMFI is public) | |
 | 9 | Telegram alerts (launch set) | Telegram bot token | |
@@ -477,22 +477,25 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - Stock splits and bonuses moved to Stage 12
 - **Done when:** every member's current holdings are entered and match their broker apps
 
-### Stage 5: Dashboard & member portfolio pages
-- Migration: `live_quotes`, `eod_prices`, `portfolio_snapshots`
-- Family dashboard: net worth, member split, allocation chart, top gainers/losers
-- Member page: current value, day change, unrealized/realized P&L
-- Uses the latest stored price (you can enter a price by hand) until Stage 6
+### Stage 5: Dashboard & member portfolio pages ✅
+- Migration `20260914150000_instrument_prices.sql`: `instrument_prices` (last price, previous close, source, time) with owner-only RLS. Stage 6 writes to the same table
+- "Update prices" form (dashboard and member page) for hand-entered prices until Stage 6
+- Family dashboard: current value, invested, unrealised P&L, today's change, booked P&L; value per member with share bars; top gainers/losers. Archived members are excluded
+- Member page: the same summary tiles; holdings show last price, today's change, current value and P&L
+- `lib/portfolio/valuation`: valuation, totals and movers, with unit tests. Holdings without a price count toward invested but not value or P&L
+- No sector allocation: the instrument file has no sector data
+- `eod_prices` and `portfolio_snapshots` (history charts) moved to Stage 7, which adds scheduled jobs
 - **Done when:** the dashboard shows correct numbers using stored prices
 
 ### Stage 6: Live prices (Angel One SmartAPI) → MVP
 - Server-side SmartAPI login with TOTP, session stored server-only
 - `/api/prices` with batching, 4-second cache, market-hours and holiday check (adds the `market_holidays` table)
-- 5-second refresh on dashboard/member pages, market open/closed badge
+- 5-second refresh on dashboard/member pages (writes to `instrument_prices`), market open/closed badge
 - **Done when:** prices update live during market hours
 
 ### Stage 7: Deployment & scheduled jobs
 - Deploy to Vercel; Supabase auth URLs for production
-- pg_cron + Edge Functions: instrument sync, Angel One login, EOD snapshot, `job_runs` log
+- pg_cron + Edge Functions: instrument sync, Angel One login, EOD snapshot, `job_runs` log (adds `eod_prices` and `portfolio_snapshots`)
 - Weekly DB backup (GitHub Action `pg_dump`)
 - **Done when:** Dad uses it from his phone and daily jobs run on their own
 

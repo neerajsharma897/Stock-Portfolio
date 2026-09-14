@@ -10,6 +10,7 @@ import { MemberStatusActions } from "@/app/(app)/members/[id]/member-status-acti
 import { TransactionsCard } from "@/app/(app)/members/[id]/transactions-card"
 import { MemberFormDialog } from "@/app/(app)/members/member-form-dialog"
 import { MemberAvatar } from "@/components/member-avatar"
+import { PortfolioSummaryTiles } from "@/components/portfolio-summary-tiles"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -20,12 +21,18 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getMember } from "@/lib/data/members"
+import { listPrices } from "@/lib/data/prices"
 import {
   listMemberTransactions,
   toHoldingTransaction,
 } from "@/lib/data/transactions"
 import { BROKER_LABELS, RELATION_LABELS } from "@/lib/members/options"
 import { groupHoldings } from "@/lib/portfolio/member-holdings"
+import {
+  buildPriceItems,
+  summarize,
+  valueHolding,
+} from "@/lib/portfolio/valuation"
 
 export async function generateMetadata({
   params,
@@ -50,15 +57,20 @@ export default async function MemberPage({
   )
 
   const transactions = await listMemberTransactions(member.id)
-  const { holdings, problems } = groupHoldings(
-    transactions.map(toHoldingTransaction),
-  )
   const instruments = new Map(
     transactions.map((transaction) => [
       transaction.instrument_id,
       transaction.instrument,
     ]),
   )
+  const prices = await listPrices(instruments.keys())
+  const { holdings, problems } = groupHoldings(
+    transactions.map(toHoldingTransaction),
+  )
+  const valued = holdings.map((holding) =>
+    valueHolding(holding, prices.get(holding.instrumentId) ?? null),
+  )
+  const summary = summarize(valued)
 
   return (
     <>
@@ -99,8 +111,8 @@ export default async function MemberPage({
 
       {archived && (
         <p className="mb-6 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-          {member.name} is archived: hidden from the members list and, later,
-          from family totals. Restore to make changes.
+          {member.name} is archived: hidden from the members list and from
+          family totals. Restore to make changes.
         </p>
       )}
 
@@ -111,14 +123,19 @@ export default async function MemberPage({
       )}
 
       <div className="grid gap-4">
+        {summary.holdingCount > 0 && (
+          <PortfolioSummaryTiles summary={summary} />
+        )}
+
         <HoldingsCard
           memberId={member.id}
           memberName={member.name}
           archived={archived}
           accounts={stockAccounts}
-          holdings={holdings}
+          holdings={valued}
           problems={problems}
           instruments={instruments}
+          priceItems={buildPriceItems(valued, instruments)}
         />
 
         <TransactionsCard

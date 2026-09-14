@@ -4,6 +4,7 @@ import {
   TransactionDialog,
   type StockAccount,
 } from "@/app/(app)/members/[id]/transaction-dialog"
+import { toneOf, toneTextClass } from "@/components/stat-tile"
 import {
   Card,
   CardAction,
@@ -12,11 +13,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { UpdatePricesDialog } from "@/components/update-prices-dialog"
 import type { TransactionInstrument } from "@/lib/data/transactions"
-import { formatINR, formatQuantity, formatSignedINR } from "@/lib/format"
+import {
+  formatINR,
+  formatPercent,
+  formatQuantity,
+  formatSignedINR,
+} from "@/lib/format"
 import { brokerAccountName } from "@/lib/members/options"
-import type { Holding, HoldingProblem } from "@/lib/portfolio/member-holdings"
+import type { HoldingProblem } from "@/lib/portfolio/member-holdings"
+import type { PriceItem, ValuedHolding } from "@/lib/portfolio/valuation"
 import { cn } from "@/lib/utils"
+
+function NoPrice() {
+  return (
+    <span className="text-muted-foreground">
+      —<span className="sr-only">no price yet</span>
+    </span>
+  )
+}
 
 export function HoldingsCard({
   memberId,
@@ -26,14 +42,16 @@ export function HoldingsCard({
   holdings,
   problems,
   instruments,
+  priceItems,
 }: {
   memberId: string
   memberName: string
   archived: boolean
   accounts: StockAccount[]
-  holdings: Holding[]
+  holdings: ValuedHolding[]
   problems: HoldingProblem[]
   instruments: Map<number, TransactionInstrument>
+  priceItems: PriceItem[]
 }) {
   const accountsById = new Map(accounts.map((account) => [account.id, account]))
   const symbolOf = (holding: { instrumentId: number }) =>
@@ -45,6 +63,7 @@ export function HoldingsCard({
   const invested = current.reduce((sum, h) => sum + h.position.invested, 0)
   const realized = holdings.reduce((sum, h) => sum + h.position.realizedPnl, 0)
   const hasBookedPnl = holdings.some((h) => h.position.realizedPnl !== 0)
+  const canAdd = !archived && accounts.length > 0
 
   return (
     <Card>
@@ -55,9 +74,12 @@ export function HoldingsCard({
             ? "No shares held yet."
             : `${current.length} ${current.length === 1 ? "holding" : "holdings"} · ${formatINR(invested)} invested`}
         </CardDescription>
-        {!archived && accounts.length > 0 && (
-          <CardAction>
-            <TransactionDialog memberId={memberId} accounts={accounts} />
+        {(canAdd || priceItems.length > 0) && (
+          <CardAction className="flex flex-wrap justify-end gap-2">
+            <UpdatePricesDialog items={priceItems} />
+            {canAdd && (
+              <TransactionDialog memberId={memberId} accounts={accounts} />
+            )}
           </CardAction>
         )}
       </CardHeader>
@@ -87,7 +109,7 @@ export function HoldingsCard({
 
         {accounts.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Add a stock broker account above before entering holdings.
+            Add a stock broker account below before entering holdings.
           </p>
         ) : current.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -97,7 +119,7 @@ export function HoldingsCard({
           </p>
         ) : (
           <div className="-mx-4 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
                   <th scope="col" className="px-4 py-2 font-medium">
@@ -110,7 +132,13 @@ export function HoldingsCard({
                     Avg cost
                   </th>
                   <th scope="col" className="px-4 py-2 text-right font-medium">
-                    Invested
+                    Last price
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">
+                    Current value
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">
+                    P&amp;L
                   </th>
                 </tr>
               </thead>
@@ -118,6 +146,8 @@ export function HoldingsCard({
                 {current.map((holding) => {
                   const instrument = instruments.get(holding.instrumentId)
                   const account = accountsById.get(holding.brokerAccountId)
+                  const pnlTone = toneTextClass(toneOf(holding.unrealizedPnl))
+
                   return (
                     <tr
                       key={`${holding.brokerAccountId}:${holding.instrumentId}`}
@@ -137,7 +167,50 @@ export function HoldingsCard({
                         {formatINR(holding.position.averageCost)}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {formatINR(holding.position.invested)}
+                        {holding.price ? (
+                          <>
+                            <div>{formatINR(holding.price.lastPrice)}</div>
+                            {holding.dayChangePct !== null && (
+                              <div
+                                className={cn(
+                                  "text-xs",
+                                  toneTextClass(toneOf(holding.dayChange)),
+                                )}
+                              >
+                                {formatPercent(holding.dayChangePct)}
+                                <span className="sr-only"> today</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <NoPrice />
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">
+                        {holding.currentValue !== null ? (
+                          formatINR(holding.currentValue)
+                        ) : (
+                          <NoPrice />
+                        )}
+                        <div className="text-xs text-muted-foreground">
+                          {formatINR(holding.position.invested)} invested
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">
+                        {holding.unrealizedPnl !== null ? (
+                          <>
+                            <div className={cn("font-medium", pnlTone)}>
+                              {formatSignedINR(holding.unrealizedPnl)}
+                            </div>
+                            {holding.unrealizedPct !== null && (
+                              <div className={cn("text-xs", pnlTone)}>
+                                {formatPercent(holding.unrealizedPct)}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <NoPrice />
+                        )}
                       </td>
                     </tr>
                   )
@@ -153,7 +226,7 @@ export function HoldingsCard({
             <span
               className={cn(
                 "font-medium tabular-nums",
-                realized >= 0 ? "text-gain" : "text-loss",
+                toneTextClass(toneOf(realized)),
               )}
             >
               {formatSignedINR(realized)}

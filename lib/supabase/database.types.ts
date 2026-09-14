@@ -81,6 +81,41 @@ export type Database = {
           },
         ]
       }
+      instrument_prices: {
+        Row: {
+          instrument_id: number
+          last_price: number
+          previous_close: number | null
+          priced_at: string
+          source: Database["public"]["Enums"]["price_source"]
+          updated_at: string
+        }
+        Insert: {
+          instrument_id: number
+          last_price: number
+          previous_close?: number | null
+          priced_at?: string
+          source?: Database["public"]["Enums"]["price_source"]
+          updated_at?: string
+        }
+        Update: {
+          instrument_id?: number
+          last_price?: number
+          previous_close?: number | null
+          priced_at?: string
+          source?: Database["public"]["Enums"]["price_source"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instrument_prices_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: true
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instruments: {
         Row: {
           created_at: string
@@ -258,6 +293,7 @@ export type Database = {
         | "brother"
         | "sister"
         | "other"
+      price_source: "manual" | "angelone"
       transaction_type: "opening_balance" | "buy" | "sell"
     }
     CompositeTypes: { [_ in never]: never }
