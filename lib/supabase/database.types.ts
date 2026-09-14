@@ -164,6 +164,24 @@ export type Database = {
         }
         Relationships: []
       }
+      market_holidays: {
+        Row: {
+          created_at: string
+          description: string
+          holiday_date: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          holiday_date: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          holiday_date?: string
+        }
+        Relationships: []
+      }
       members: {
         Row: {
           archived_at: string | null

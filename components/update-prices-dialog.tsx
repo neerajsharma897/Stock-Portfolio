@@ -21,7 +21,7 @@ import type { FormState } from "@/lib/action-state"
 import { formatDate } from "@/lib/format"
 import type { PriceItem } from "@/lib/portfolio/valuation"
 
-/** Hand-entered prices until Stage 6 fetches them from Angel One. */
+/** Hand-entered prices, for when Angel One live prices aren't set up or need correcting. */
 export function UpdatePricesDialog({ items }: { items: PriceItem[] }) {
   const [open, setOpen] = useState(false)
   if (items.length === 0) return null
@@ -38,9 +38,10 @@ export function UpdatePricesDialog({ items }: { items: PriceItem[] }) {
         <DialogHeader>
           <DialogTitle>Update prices</DialogTitle>
           <DialogDescription>
-            Until live prices arrive, copy the last price and previous close
-            from the broker app. Leave a last price blank to keep the saved one.
-            Without a previous close, today&apos;s change isn&apos;t shown.
+            Copy the last price and previous close from the broker app. Use this
+            when live prices aren&apos;t set up, or to correct a price (live
+            prices replace it on their next update). Leave a last price blank to
+            keep the saved one.
           </DialogDescription>
         </DialogHeader>
         <PricesForm

@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import { unstable_rethrow } from "next/navigation"
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react"
 
+import { DeleteHolidayButton } from "@/app/(app)/settings/delete-holiday-button"
+import { HolidayForm } from "@/app/(app)/settings/holiday-form"
 import { UpdateStockListButton } from "@/app/(app)/settings/update-stock-list-button"
 import { ComingSoon } from "@/components/coming-soon"
 import { PageHeader } from "@/components/layout/page-header"
@@ -13,11 +15,15 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { requireUser } from "@/lib/auth"
+import { listMarketHolidays, type MarketHoliday } from "@/lib/data/holidays"
 import {
   getStockListStatus,
   type StockListStatus,
 } from "@/lib/data/instruments"
+import { todayInIndia } from "@/lib/dates"
 import { formatDate, formatQuantity } from "@/lib/format"
+import { getLiveStatus } from "@/lib/prices/live"
+import { describeLiveStatus, type LiveStatus } from "@/lib/prices/live-status"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = { title: "Settings" }
@@ -51,30 +57,115 @@ function StatusRow({
   )
 }
 
-async function loadStockListStatus(): Promise<
-  { status: StockListStatus } | { error: string }
-> {
+/** Runs a loader, turning real failures into a message but letting Next.js redirects through. */
+async function attempt<T>(
+  load: () => Promise<T>,
+): Promise<{ value: T } | { error: string }> {
   try {
-    return { status: await getStockListStatus() }
+    return { value: await load() }
   } catch (error) {
-    // Let Next.js redirects through; only real failures become a message.
     unstable_rethrow(error)
-    return {
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
+    return { error: error instanceof Error ? error.message : "Unknown error" }
   }
+}
+
+function LivePricesCard({ status }: { status: LiveStatus }) {
+  const badge = describeLiveStatus(status)
+  return (
+    <div className="grid gap-4">
+      <StatusRow
+        ok={status.configured}
+        label={
+          status.configured
+            ? "Angel One settings found"
+            : "Angel One settings missing"
+        }
+        detail={
+          status.configured
+            ? undefined
+            : "Add ANGELONE_API_KEY, ANGELONE_CLIENT_CODE, ANGELONE_PIN and ANGELONE_TOTP_SECRET to .env.local, then restart the app. See README."
+        }
+      />
+      {status.configured && (
+        <StatusRow
+          ok={!status.error}
+          label={
+            status.error
+              ? "Last fetch failed"
+              : status.lastFetchedAt
+                ? "Fetching prices"
+                : "No prices fetched yet"
+          }
+          detail={
+            status.error ??
+            (status.lastFetchedAt
+              ? undefined
+              : "Open the dashboard; prices are fetched while it's open.")
+          }
+        />
+      )}
+      <p className="text-sm text-muted-foreground">
+        {badge.tone === "live" ? "Market open" : badge.label}
+        {badge.tone !== "manual" && badge.tone !== "error" && badge.detail
+          ? ` · ${badge.detail}`
+          : ""}
+        . Prices refresh every 5 seconds during market hours (Mon–Fri, 9:15
+        AM–3:30 PM India time) while the dashboard or a member page is open.
+      </p>
+    </div>
+  )
+}
+
+function HolidayList({ holidays }: { holidays: MarketHoliday[] }) {
+  if (holidays.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No upcoming holidays listed. Add this year&apos;s trading holidays from
+        the NSE website so live prices pause on those days.
+      </p>
+    )
+  }
+  return (
+    <ul className="divide-y text-sm">
+      {holidays.map((holiday) => {
+        const label = `${formatDate(holiday.date)}, ${holiday.description}`
+        return (
+          <li
+            key={holiday.date}
+            className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+          >
+            <span>
+              <span className="font-medium tabular-nums">
+                {formatDate(holiday.date)}
+              </span>
+              <span className="text-muted-foreground">
+                {" "}
+                · {holiday.description}
+              </span>
+            </span>
+            <DeleteHolidayButton date={holiday.date} label={label} />
+          </li>
+        )
+      })}
+    </ul>
+  )
 }
 
 export default async function SettingsPage() {
   const user = await requireUser()
   const supabase = await createClient()
-  const [{ data: owner, error }, stockList] = await Promise.all([
-    supabase
-      .from("app_owner")
-      .select("display_name, timezone, created_at")
-      .maybeSingle(),
-    loadStockListStatus(),
-  ])
+  const [{ data: owner, error }, stockList, liveStatus, holidays] =
+    await Promise.all([
+      supabase
+        .from("app_owner")
+        .select("display_name, timezone, created_at")
+        .maybeSingle(),
+      attempt<StockListStatus>(getStockListStatus),
+      attempt<LiveStatus>(getLiveStatus),
+      attempt<MarketHoliday[]>(() =>
+        listMarketHolidays({ from: todayInIndia() }),
+      ),
+    ])
 
   return (
     <>
@@ -152,23 +243,68 @@ export default async function SettingsPage() {
                 <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
                   <dt className="text-muted-foreground">Stocks & gold bonds</dt>
                   <dd>
-                    {stockList.status.count > 0
-                      ? formatQuantity(stockList.status.count)
+                    {stockList.value.count > 0
+                      ? formatQuantity(stockList.value.count)
                       : "None yet"}
                   </dd>
                   <dt className="text-muted-foreground">Last updated</dt>
                   <dd>
-                    {stockList.status.lastUpdated
-                      ? formatDate(stockList.status.lastUpdated)
+                    {stockList.value.lastUpdated
+                      ? formatDate(stockList.value.lastUpdated)
                       : "Never"}
                   </dd>
                 </dl>
-                <UpdateStockListButton hasList={stockList.status.count > 0} />
+                <UpdateStockListButton hasList={stockList.value.count > 0} />
                 <p className="text-sm text-muted-foreground">
-                  {stockList.status.count > 0
+                  {stockList.value.count > 0
                     ? "Update every few weeks to pick up new listings."
                     : "Download the list once before adding transactions. It takes up to a minute."}
                 </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Live prices</CardTitle>
+            <CardDescription>
+              Latest prices from Angel One SmartAPI. Without it, enter prices by
+              hand on the dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {"error" in liveStatus ? (
+              <StatusRow
+                ok={false}
+                label="Live prices unavailable"
+                detail={`Run the market holidays migration (see README). ${liveStatus.error}`}
+              />
+            ) : (
+              <LivePricesCard status={liveStatus.value} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Market holidays</CardTitle>
+            <CardDescription>
+              Weekdays when NSE and BSE are closed. Live prices aren&apos;t
+              fetched on these days.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5">
+            {"error" in holidays ? (
+              <StatusRow
+                ok={false}
+                label="Holidays unavailable"
+                detail={`Run the market holidays migration (see README). ${holidays.error}`}
+              />
+            ) : (
+              <>
+                <HolidayList holidays={holidays.value} />
+                <HolidayForm />
               </>
             )}
           </CardContent>

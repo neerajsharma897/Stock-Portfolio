@@ -5,18 +5,22 @@ import Link from "next/link"
 import { MemberSplit } from "@/app/(app)/dashboard/member-split"
 import { TopMovers } from "@/app/(app)/dashboard/top-movers"
 import { PageHeader } from "@/components/layout/page-header"
+import { LivePrices } from "@/components/live-prices"
 import { PortfolioSummaryTiles } from "@/components/portfolio-summary-tiles"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { UpdatePricesDialog } from "@/components/update-prices-dialog"
 import { getFamilyPortfolio } from "@/lib/data/portfolio"
-import { formatDate } from "@/lib/format"
+import { getLiveStatus } from "@/lib/prices/live"
 
 export const metadata: Metadata = { title: "Dashboard" }
 
 export default async function DashboardPage() {
-  const { members, summary, instruments, priceItems, movers } =
-    await getFamilyPortfolio()
+  const [portfolio, liveStatus] = await Promise.all([
+    getFamilyPortfolio(),
+    getLiveStatus(),
+  ])
+  const { members, summary, instruments, priceItems, movers } = portfolio
 
   const hasActivity = summary.holdingCount > 0 || summary.realizedPnl !== 0
   if (members.length === 0 || !hasActivity) {
@@ -52,20 +56,19 @@ export default async function DashboardPage() {
   }
 
   const membersWithProblems = members.filter(
-    (portfolio) => portfolio.problems.length > 0,
+    (memberPortfolio) => memberPortfolio.problems.length > 0,
   )
 
   return (
     <>
       <PageHeader
         title="Family dashboard"
-        description={
-          summary.latestPricedAt
-            ? `Prices entered by hand, last updated ${formatDate(summary.latestPricedAt)}. Live prices come in Stage 6.`
-            : "Update prices to see current value and P&L. Live prices come in Stage 6."
-        }
+        description="Everyone's investments at a glance."
       >
-        <UpdatePricesDialog items={priceItems} />
+        <div className="flex flex-wrap items-center gap-3">
+          <LivePrices initialStatus={liveStatus} />
+          <UpdatePricesDialog items={priceItems} />
+        </div>
       </PageHeader>
 
       {membersWithProblems.length > 0 && (
@@ -79,14 +82,14 @@ export default async function DashboardPage() {
           />
           <p>
             Some entries don&apos;t add up for{" "}
-            {membersWithProblems.map((portfolio, index) => (
-              <span key={portfolio.member.id}>
+            {membersWithProblems.map((memberPortfolio, index) => (
+              <span key={memberPortfolio.member.id}>
                 {index > 0 && ", "}
                 <Link
-                  href={`/members/${portfolio.member.id}`}
+                  href={`/members/${memberPortfolio.member.id}`}
                   className="font-medium underline underline-offset-4"
                 >
-                  {portfolio.member.name}
+                  {memberPortfolio.member.name}
                 </Link>
               </span>
             ))}

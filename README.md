@@ -49,6 +49,28 @@ Open http://localhost:3000, sign in, then open **Settings**: every setup check s
 
 Without `.env.local` the app still starts and shows a "Connect Supabase" notice.
 
+### 5. Live prices from Angel One (optional)
+
+Without this, enter prices by hand with **Update prices** on the dashboard.
+
+1. Create an app at [smartapi.angelone.in](https://smartapi.angelone.in) (My Apps) and copy its **API key**.
+2. Enable TOTP for the Angel One account (**Enable TOTP** on the SmartAPI site). Save the **text secret**
+   shown with the QR code. That's what authenticator apps store; it isn't the 6-digit code.
+3. Add these to `.env.local`. They are server-only: never prefix them with `NEXT_PUBLIC_`.
+   Anyone with them can log in to the Angel One account, so keep them private.
+   ```
+   ANGELONE_API_KEY=...
+   ANGELONE_CLIENT_CODE=...
+   ANGELONE_PIN=...
+   ANGELONE_TOTP_SECRET=...
+   ```
+4. Restart `npm run dev` and check **Settings → Live prices**.
+5. Add this year's NSE trading holidays in **Settings → Market holidays**.
+
+While the market is open (Mon–Fri, 9:15 AM–3:30 PM India time, except listed holidays), the dashboard
+and member pages refresh prices every 5 seconds. Outside market hours prices are fetched at most every
+30 minutes. SmartAPI allows 50 stocks per quote request and 1 quote request per second.
+
 ## Scripts
 
 | Command | What it does |

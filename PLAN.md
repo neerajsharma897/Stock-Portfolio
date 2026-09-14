@@ -435,8 +435,8 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 3 | Stock list & search | — (public Angel One instrument file) | ✅ Built (with 4) |
 | 4 | Transactions & holdings engine | — | ✅ Built |
 | 5 | Dashboard & member portfolio pages | — | ✅ Built |
-| 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | Next |
-| 7 | Deployment & scheduled jobs | Vercel | |
+| 6 | Live prices (Angel One SmartAPI) → **MVP** | Angel One API key + TOTP | ✅ Built |
+| 7 | Deployment & scheduled jobs | Vercel | Next |
 | 8 | Mutual funds | — (AMFI is public) | |
 | 9 | Telegram alerts (launch set) | Telegram bot token | |
 | 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | |
@@ -487,10 +487,14 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - `eod_prices` and `portfolio_snapshots` (history charts) moved to Stage 7, which adds scheduled jobs
 - **Done when:** the dashboard shows correct numbers using stored prices
 
-### Stage 6: Live prices (Angel One SmartAPI) → MVP
-- Server-side SmartAPI login with TOTP, session stored server-only
-- `/api/prices` with batching, 4-second cache, market-hours and holiday check (adds the `market_holidays` table)
-- 5-second refresh on dashboard/member pages (writes to `instrument_prices`), market open/closed badge
+### Stage 6: Live prices (Angel One SmartAPI) → MVP ✅
+- Server-side SmartAPI login (`loginByPassword`) with a TOTP generated in `lib/angelone/totp` (RFC 6238, tested against the RFC vectors). The session is cached in server memory, never sent to the browser
+- `lib/angelone/client`: quote API in FULL mode, 50 tokens per request, requests spaced over 1 second (SmartAPI limit), one retry with a fresh login when the session is rejected
+- `POST /api/prices/refresh` (owner only) calls Angel One at most every 4 seconds while the market is open and every 30 minutes otherwise; backs off 10 minutes after a failed login so wrong settings can't lock the account
+- Migration `20260914160000_market_holidays.sql`; market hours Mon–Fri 9:15–15:30 IST in `lib/market-hours`; holidays managed in Settings
+- Live badge on the dashboard and member pages polls every 5 seconds while the tab is visible and refreshes the page when prices change; Settings shows the live prices status
+- Prices are written to `instrument_prices` with `source = 'angelone'`; hand-entered prices still work without the API
+- Session renewal is in memory, so a serverless deployment logs in again after cold starts (revisit in Stage 7)
 - **Done when:** prices update live during market hours
 
 ### Stage 7: Deployment & scheduled jobs

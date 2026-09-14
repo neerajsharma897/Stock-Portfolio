@@ -9,6 +9,7 @@ import { HoldingsCard } from "@/app/(app)/members/[id]/holdings-card"
 import { MemberStatusActions } from "@/app/(app)/members/[id]/member-status-actions"
 import { TransactionsCard } from "@/app/(app)/members/[id]/transactions-card"
 import { MemberFormDialog } from "@/app/(app)/members/member-form-dialog"
+import { LivePrices } from "@/components/live-prices"
 import { MemberAvatar } from "@/components/member-avatar"
 import { PortfolioSummaryTiles } from "@/components/portfolio-summary-tiles"
 import { Badge } from "@/components/ui/badge"
@@ -33,6 +34,7 @@ import {
   summarize,
   valueHolding,
 } from "@/lib/portfolio/valuation"
+import { getLiveStatus } from "@/lib/prices/live"
 
 export async function generateMetadata({
   params,
@@ -56,7 +58,10 @@ export default async function MemberPage({
     (account) => account.broker !== "coindcx",
   )
 
-  const transactions = await listMemberTransactions(member.id)
+  const [transactions, liveStatus] = await Promise.all([
+    listMemberTransactions(member.id),
+    getLiveStatus(),
+  ])
   const instruments = new Map(
     transactions.map((transaction) => [
       transaction.instrument_id,
@@ -124,7 +129,12 @@ export default async function MemberPage({
 
       <div className="grid gap-4">
         {summary.holdingCount > 0 && (
-          <PortfolioSummaryTiles summary={summary} />
+          <>
+            <div className="flex justify-end">
+              <LivePrices initialStatus={liveStatus} />
+            </div>
+            <PortfolioSummaryTiles summary={summary} />
+          </>
         )}
 
         <HoldingsCard
