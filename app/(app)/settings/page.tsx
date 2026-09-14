@@ -29,7 +29,7 @@ function StatusRow({
   return (
     <div className="flex gap-3">
       <Icon
-        className={ok ? "size-5 text-emerald-600" : "size-5 text-destructive"}
+        className={ok ? "size-5 text-gain" : "size-5 text-destructive"}
         aria-hidden
       />
       <div className="grid gap-0.5">
