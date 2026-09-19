@@ -4,6 +4,8 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { BrokerAccountDialog } from "@/app/(app)/members/[id]/broker-account-dialog"
+import { CryptoCard } from "@/app/(app)/members/[id]/crypto-card"
+import { CryptoTransactionsCard } from "@/app/(app)/members/[id]/crypto-transactions-card"
 import { DeleteAccountButton } from "@/app/(app)/members/[id]/delete-account-button"
 import { FundTransactionsCard } from "@/app/(app)/members/[id]/fund-transactions-card"
 import { FundsCard } from "@/app/(app)/members/[id]/funds-card"
@@ -11,6 +13,7 @@ import { HoldingsCard } from "@/app/(app)/members/[id]/holdings-card"
 import { MemberStatusActions } from "@/app/(app)/members/[id]/member-status-actions"
 import { TransactionsCard } from "@/app/(app)/members/[id]/transactions-card"
 import { MemberFormDialog } from "@/app/(app)/members/member-form-dialog"
+import { LiveCryptoPrices } from "@/components/live-crypto-prices"
 import { LivePrices } from "@/components/live-prices"
 import { MemberAvatar } from "@/components/member-avatar"
 import { PortfolioSummaryTiles } from "@/components/portfolio-summary-tiles"
@@ -23,6 +26,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  forFamilyTotals as cryptoForFamilyTotals,
+  groupCryptoHoldings,
+  valueCrypto,
+} from "@/lib/crypto/portfolio"
+import {
+  listMemberCryptoTransactions,
+  toCoinPrice,
+  toCryptoHoldingTransaction,
+} from "@/lib/data/crypto"
 import { getMember } from "@/lib/data/members"
 import {
   listMemberFundTransactions,
@@ -34,7 +47,11 @@ import {
   listMemberTransactions,
   toHoldingTransaction,
 } from "@/lib/data/transactions"
-import { BROKER_LABELS, RELATION_LABELS } from "@/lib/members/options"
+import {
+  BROKER_LABELS,
+  canHoldCrypto,
+  RELATION_LABELS,
+} from "@/lib/members/options"
 import {
   combinedReturn,
   forFamilyTotals,
@@ -66,16 +83,21 @@ export default async function MemberPage({
 
   const archived = !!member.archived_at
   const accounts = member.broker_accounts
-  // CoinDCX holds crypto (Stage 10), so it can't be used for stock transactions.
+  // CoinDCX holds only crypto, so it can't be used for stocks or mutual funds.
   const stockAccounts = accounts.filter(
     (account) => account.broker !== "coindcx",
   )
+  const cryptoAccounts = accounts.filter((account) =>
+    canHoldCrypto(account.broker),
+  )
 
-  const [transactions, fundTransactions, liveStatus] = await Promise.all([
-    listMemberTransactions(member.id),
-    listMemberFundTransactions(member.id),
-    getLiveStatus(),
-  ])
+  const [transactions, fundTransactions, cryptoTransactions, liveStatus] =
+    await Promise.all([
+      listMemberTransactions(member.id),
+      listMemberFundTransactions(member.id),
+      listMemberCryptoTransactions(member.id),
+      getLiveStatus(),
+    ])
   const instruments = new Map(
     transactions.map((transaction) => [
       transaction.instrument_id,
@@ -103,7 +125,25 @@ export default async function MemberPage({
   const funds = fundHoldings.map((holding) =>
     valueFund(holding, toFundNav(schemes.get(holding.amfiCode))),
   )
-  const summary = summarize([...valued, ...forFamilyTotals(funds)])
+
+  const coins = new Map(
+    cryptoTransactions.map((transaction) => [
+      transaction.market,
+      transaction.coin,
+    ]),
+  )
+  const { holdings: cryptoHoldings, problems: cryptoProblems } =
+    groupCryptoHoldings(cryptoTransactions.map(toCryptoHoldingTransaction))
+  const crypto = cryptoHoldings.map((holding) =>
+    valueCrypto(holding, toCoinPrice(coins.get(holding.market))),
+  )
+  const cryptoSummary = summarize(crypto)
+
+  const summary = summarize([
+    ...valued,
+    ...forFamilyTotals(funds),
+    ...cryptoForFamilyTotals(crypto),
+  ])
 
   return (
     <div className="grid gap-2">
@@ -132,6 +172,9 @@ export default async function MemberPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasStocks && <LivePrices initialStatus={liveStatus} />}
+          {cryptoSummary.holdingCount > 0 && (
+            <LiveCryptoPrices initialPricedAt={cryptoSummary.latestPricedAt} />
+          )}
           {!archived && <MemberFormDialog member={member} />}
           <MemberStatusActions
             memberId={member.id}
@@ -179,6 +222,16 @@ export default async function MemberPage({
         xirr={combinedReturn(funds)}
       />
 
+      <CryptoCard
+        memberId={member.id}
+        memberName={member.name}
+        archived={archived}
+        accounts={cryptoAccounts}
+        holdings={crypto}
+        problems={cryptoProblems}
+        coins={coins}
+      />
+
       <TransactionsCard
         memberId={member.id}
         archived={archived}
@@ -191,6 +244,13 @@ export default async function MemberPage({
         archived={archived}
         accounts={stockAccounts}
         transactions={fundTransactions}
+      />
+
+      <CryptoTransactionsCard
+        memberId={member.id}
+        archived={archived}
+        accounts={cryptoAccounts}
+        transactions={cryptoTransactions}
       />
 
       <Card>

@@ -14,6 +14,14 @@ export const JOBS = {
     label: "Stock list update",
     schedule: "Mondays, between 7:30 and 8:30 AM India time",
   },
+  news: {
+    label: "Stock news",
+    schedule: "Every day, between 6:30 and 7:30 AM India time",
+  },
+  "coin-list": {
+    label: "Crypto coin list",
+    schedule: "Mondays, between 8:30 and 9:30 AM India time",
+  },
 } as const
 
 export type JobName = keyof typeof JOBS

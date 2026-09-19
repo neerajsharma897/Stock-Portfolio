@@ -41,7 +41,28 @@ describe("buildPosition", () => {
       averageCost: 0,
       realizedPnl: 0,
       lots: [],
+      sales: [],
     })
+  })
+
+  it("records each sell with the cost of the shares it used", () => {
+    const result = position([
+      txn("buy", 10, 100, "2024-01-01", { charges: 10 }),
+      txn("buy", 10, 200, "2024-02-01"),
+      txn("sell", 15, 150, "2024-03-01", { charges: 5 }),
+    ])
+    expect(result.sales).toHaveLength(1)
+    const [sale] = result.sales
+    expect(sale).toMatchObject({
+      date: "2024-03-01",
+      quantity: 15,
+      price: 150,
+      charges: 5,
+    })
+    // 10 shares at 101 (with charges) and 5 at 200.
+    expect(sale.costBasis).toBeCloseTo(2010)
+    expect(sale.realizedPnl).toBeCloseTo(2250 - 5 - 2010)
+    expect(result.realizedPnl).toBeCloseTo(sale.realizedPnl)
   })
 
   it("adds buy charges to the cost and averages across lots", () => {

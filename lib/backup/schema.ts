@@ -7,10 +7,12 @@ import { TRANSACTION_TYPES } from "@/lib/transactions/options"
 // Backup file format. Rows use the database column names; stocks are referenced
 // by exchange and Angel One token (plus symbol, for reading) because instrument
 // ids differ between databases. Mutual funds use the AMFI code, which doesn't.
-// Version 2 adds mutual fund entries; version 1 files (without them) still restore.
+// Version 2 adds mutual fund entries; version 3 adds crypto entries (by CoinDCX
+// market), the watchlist and news search names; version 4 adds named watchlists.
+// Older files still restore (a version 3 watchlist becomes "Watchlist 1").
 
 export const BACKUP_APP = "family-portfolio"
-export const BACKUP_VERSION = 2
+export const BACKUP_VERSION = 4
 
 const timestamp = z.string().min(1)
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -23,7 +25,12 @@ const stockRef = {
 
 export const backupSchema = z.object({
   app: z.literal(BACKUP_APP),
-  version: z.union([z.literal(1), z.literal(BACKUP_VERSION)]),
+  version: z.union([
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(BACKUP_VERSION),
+  ]),
   exportedAt: timestamp,
   members: z.array(
     z.object({
@@ -85,6 +92,50 @@ export const backupSchema = z.object({
       }),
     )
     .default([]),
+  cryptoTransactions: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        member_id: z.uuid(),
+        broker_account_id: z.uuid(),
+        market: z.string().min(1),
+        type: z.enum(TRANSACTION_TYPES),
+        quantity: z.number().positive(),
+        price: z.number().positive(),
+        charges: z.number().nonnegative(),
+        trade_date: isoDate,
+        notes: nullableText,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .default([]),
+  watchlists: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        name: z.string().min(1),
+        position: z.number().int(),
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .default([]),
+  watchlist: z
+    .array(
+      z.object({
+        /** Missing in version 3, which had a single watchlist. */
+        watchlist_id: z.uuid().optional(),
+        ...stockRef,
+        note: nullableText,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .default([]),
+  newsSearches: z
+    .array(z.object({ ...stockRef, search_name: z.string().min(1) }))
+    .default([]),
   instrumentPrices: z.array(
     z.object({
       ...stockRef,
@@ -132,6 +183,9 @@ export type BackupCounts = {
   brokerAccounts: number
   transactions: number
   fundEntries: number
+  cryptoEntries: number
+  watchlists: number
+  watchlist: number
   prices: number
   holidays: number
   closingPrices: number
@@ -144,6 +198,9 @@ export function countBackup(backup: Backup): BackupCounts {
     brokerAccounts: backup.brokerAccounts.length,
     transactions: backup.transactions.length,
     fundEntries: backup.mfTransactions.length,
+    cryptoEntries: backup.cryptoTransactions.length,
+    watchlists: backup.watchlists.length,
+    watchlist: backup.watchlist.length,
     prices: backup.instrumentPrices.length,
     holidays: backup.marketHolidays.length,
     closingPrices: backup.eodPrices.length,
@@ -163,6 +220,8 @@ export function stockRefs(
     ...backup.transactions,
     ...backup.instrumentPrices,
     ...backup.eodPrices,
+    ...backup.watchlist,
+    ...backup.newsSearches,
   ]) {
     refs.set(`${row.exchange}:${row.token}`, {
       exchange: row.exchange,
@@ -176,4 +235,9 @@ export function stockRefs(
 /** Every distinct mutual fund (AMFI code) the backup refers to. */
 export function fundRefs(backup: Backup): number[] {
   return [...new Set(backup.mfTransactions.map((row) => row.amfi_code))]
+}
+
+/** Every distinct coin (CoinDCX market) the backup refers to. */
+export function coinRefs(backup: Backup): string[] {
+  return [...new Set(backup.cryptoTransactions.map((row) => row.market))]
 }

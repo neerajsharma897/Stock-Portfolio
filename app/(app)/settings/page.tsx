@@ -5,6 +5,7 @@ import { CircleAlertIcon, CircleCheckIcon } from "lucide-react"
 import { BackupCard } from "@/app/(app)/settings/backup-card"
 import { DeleteHolidayButton } from "@/app/(app)/settings/delete-holiday-button"
 import { HolidayForm } from "@/app/(app)/settings/holiday-form"
+import { UpdateCoinListButton } from "@/app/(app)/settings/update-coin-list-button"
 import { UpdateFundListButton } from "@/app/(app)/settings/update-fund-list-button"
 import { UpdateStockListButton } from "@/app/(app)/settings/update-stock-list-button"
 import { ComingSoon } from "@/components/coming-soon"
@@ -17,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { requireUser } from "@/lib/auth"
+import { getCoinListStatus, type CoinListStatus } from "@/lib/data/crypto"
 import { listMarketHolidays, type MarketHoliday } from "@/lib/data/holidays"
 import {
   getStockListStatus,
@@ -235,6 +237,7 @@ export default async function SettingsPage() {
     { data: owner, error },
     stockList,
     fundList,
+    coinList,
     liveStatus,
     holidays,
     jobRuns,
@@ -245,6 +248,7 @@ export default async function SettingsPage() {
       .maybeSingle(),
     attempt<StockListStatus>(getStockListStatus),
     attempt<FundListStatus>(getFundListStatus),
+    attempt<CoinListStatus>(getCoinListStatus),
     attempt<LiveStatus>(getLiveStatus),
     attempt<MarketHoliday[]>(() =>
       listMarketHolidays({ from: todayInIndia() }),
@@ -400,6 +404,48 @@ export default async function SettingsPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Crypto coin list</CardTitle>
+            <CardDescription>
+              Coins traded for rupees on CoinDCX, with their latest prices. Used
+              to pick coins when adding crypto.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {"error" in coinList ? (
+              <StatusRow
+                ok={false}
+                label="Coin list unavailable"
+                detail={`Run the crypto, watchlist and news migration (see README). ${coinList.error}`}
+              />
+            ) : (
+              <>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                  <dt className="text-muted-foreground">Coins</dt>
+                  <dd>
+                    {coinList.value.count > 0
+                      ? formatQuantity(coinList.value.count)
+                      : "None yet"}
+                  </dd>
+                  <dt className="text-muted-foreground">Last updated</dt>
+                  <dd>
+                    {coinList.value.lastUpdated
+                      ? formatDate(coinList.value.lastUpdated)
+                      : "Never"}
+                  </dd>
+                </dl>
+                <UpdateCoinListButton hasList={coinList.value.count > 0} />
+                <p className="text-sm text-muted-foreground">
+                  {coinList.value.count > 0
+                    ? "Updated automatically every Monday once the app is deployed. Prices of coins the family holds refresh every 30 seconds while a page showing them is open."
+                    : "Download the list once before adding crypto. It takes a few seconds."}
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Live prices</CardTitle>
             <CardDescription>
               Latest prices from Angel One SmartAPI. Without it, enter prices by
@@ -419,12 +465,13 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Scheduled jobs</CardTitle>
             <CardDescription>
               Automatic tasks on the deployed site: daily portfolio snapshots,
-              nightly mutual fund NAVs and the weekly stock list update.
+              nightly mutual fund NAVs, morning stock news and the weekly stock
+              and coin list updates.
             </CardDescription>
           </CardHeader>
           <CardContent>

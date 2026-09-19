@@ -81,6 +81,112 @@ export type Database = {
           },
         ]
       }
+      crypto_assets: {
+        Row: {
+          change_24h_pct: number | null
+          created_at: string
+          is_active: boolean
+          last_price: number | null
+          last_seen_at: string
+          market: string
+          name: string
+          priced_at: string | null
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          change_24h_pct?: number | null
+          created_at?: string
+          is_active?: boolean
+          last_price?: number | null
+          last_seen_at?: string
+          market: string
+          name: string
+          priced_at?: string | null
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          change_24h_pct?: number | null
+          created_at?: string
+          is_active?: boolean
+          last_price?: number | null
+          last_seen_at?: string
+          market?: string
+          name?: string
+          priced_at?: string | null
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crypto_transactions: {
+        Row: {
+          broker_account_id: string
+          charges: number
+          created_at: string
+          id: string
+          market: string
+          member_id: string
+          notes: string | null
+          price: number
+          quantity: number
+          trade_date: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string
+        }
+        Insert: {
+          broker_account_id: string
+          charges?: number
+          created_at?: string
+          id?: string
+          market: string
+          member_id: string
+          notes?: string | null
+          price: number
+          quantity: number
+          trade_date: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+        }
+        Update: {
+          broker_account_id?: string
+          charges?: number
+          created_at?: string
+          id?: string
+          market?: string
+          member_id?: string
+          notes?: string | null
+          price?: number
+          quantity?: number
+          trade_date?: string
+          type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crypto_transactions_broker_account_id_member_id_fkey"
+            columns: ["broker_account_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "broker_accounts"
+            referencedColumns: ["id", "member_id"]
+          },
+          {
+            foreignKeyName: "crypto_transactions_market_fkey"
+            columns: ["market"]
+            isOneToOne: false
+            referencedRelation: "crypto_assets"
+            referencedColumns: ["market"]
+          },
+          {
+            foreignKeyName: "crypto_transactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eod_prices: {
         Row: {
           close_price: number
@@ -410,6 +516,95 @@ export type Database = {
           },
         ]
       }
+      news_article_stocks: {
+        Row: {
+          article_id: number
+          instrument_id: number
+        }
+        Insert: {
+          article_id: number
+          instrument_id: number
+        }
+        Update: {
+          article_id?: number
+          instrument_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_article_stocks_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "news_articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "news_article_stocks_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: false
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      news_articles: {
+        Row: {
+          created_at: string
+          id: number
+          published_at: string
+          source: string | null
+          title: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          published_at: string
+          source?: string | null
+          title: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          published_at?: string
+          source?: string | null
+          title?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      news_feeds: {
+        Row: {
+          checked_at: string | null
+          error: string | null
+          instrument_id: number
+          search_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          checked_at?: string | null
+          error?: string | null
+          instrument_id: number
+          search_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          checked_at?: string | null
+          error?: string | null
+          instrument_id?: number
+          search_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_feeds_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: true
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_snapshots: {
         Row: {
           created_at: string
@@ -520,6 +715,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      watchlist_items: {
+        Row: {
+          created_at: string
+          instrument_id: number
+          note: string | null
+          updated_at: string
+          watchlist_id: string
+        }
+        Insert: {
+          created_at?: string
+          instrument_id: number
+          note?: string | null
+          updated_at?: string
+          watchlist_id: string
+        }
+        Update: {
+          created_at?: string
+          instrument_id?: number
+          note?: string | null
+          updated_at?: string
+          watchlist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_items_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: false
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "watchlist_items_watchlist_id_fkey"
+            columns: ["watchlist_id"]
+            isOneToOne: false
+            referencedRelation: "watchlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watchlists: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: { [_ in never]: never }

@@ -5,6 +5,7 @@ import { refresh } from "next/cache"
 import { actionError, type FormState } from "@/lib/action-state"
 import { requireOwner } from "@/lib/auth"
 import {
+  findMissingCoins,
   findMissingFunds,
   findMissingStocks,
   readBackupUpload,
@@ -40,17 +41,24 @@ function missingFundsMessage(missing: number[]) {
   return `${missing.length} mutual ${missing.length === 1 ? "fund" : "funds"} in this backup ${missing.length === 1 ? "isn't" : "aren't"} in the fund list (scheme ${missing.length === 1 ? "code" : "codes"} ${examples}${missing.length > 5 ? ", …" : ""}). Download the fund list above, then try again.`
 }
 
-/** A message when the backup refers to stocks or funds this database doesn't have. */
+function missingCoinsMessage(missing: string[]) {
+  const examples = missing.slice(0, 5).join(", ")
+  return `${missing.length} ${missing.length === 1 ? "coin" : "coins"} in this backup ${missing.length === 1 ? "isn't" : "aren't"} in the coin list (${examples}${missing.length > 5 ? ", …" : ""}). Download the coin list above, then try again.`
+}
+
+/** A message when the backup refers to stocks, funds or coins this database doesn't have. */
 async function checkReferences(
   supabase: AppSupabaseClient,
   backup: Backup,
 ): Promise<string | null> {
-  const [stocks, funds] = await Promise.all([
+  const [stocks, funds, coins] = await Promise.all([
     findMissingStocks(supabase, backup),
     findMissingFunds(supabase, backup),
+    findMissingCoins(supabase, backup),
   ])
   if (stocks.length > 0) return missingStocksMessage(stocks)
   if (funds.length > 0) return missingFundsMessage(funds)
+  if (coins.length > 0) return missingCoinsMessage(coins)
   return null
 }
 
@@ -101,7 +109,7 @@ export async function restoreBackup(formData: FormData): Promise<FormState> {
     const counts = countBackup(backup)
     return {
       status: "success",
-      message: `Restored ${counts.members} members, ${counts.transactions} stock transactions and ${counts.fundEntries} mutual fund entries from the backup.`,
+      message: `Restored ${counts.members} members, ${counts.transactions} stock transactions, ${counts.fundEntries} mutual fund entries and ${counts.cryptoEntries} crypto entries from the backup.`,
     }
   } catch (error) {
     return actionError(messageOf(error))

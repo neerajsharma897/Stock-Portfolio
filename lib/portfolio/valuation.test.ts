@@ -23,6 +23,7 @@ function holding(
       averageCost: quantity > 0 ? invested / quantity : 0,
       realizedPnl,
       lots: [],
+      sales: [],
     },
   }
 }

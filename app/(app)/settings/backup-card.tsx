@@ -23,6 +23,9 @@ const COUNT_LABELS: [keyof BackupCounts, string][] = [
   ["brokerAccounts", "Broker accounts"],
   ["transactions", "Stock transactions"],
   ["fundEntries", "Mutual fund entries"],
+  ["cryptoEntries", "Crypto entries"],
+  ["watchlists", "Watchlists"],
+  ["watchlist", "Watchlist stocks"],
   ["prices", "Saved prices"],
   ["holidays", "Market holidays"],
   ["closingPrices", "Daily closing prices"],
@@ -77,9 +80,9 @@ export function BackupCard() {
             Download your data
           </h3>
           <p className="text-sm text-muted-foreground">
-            Members, accounts, stock and mutual fund entries, prices, holidays
-            and daily history in one file. Keep it somewhere safe; it isn&apos;t
-            encrypted.
+            Members, accounts, stock, mutual fund and crypto entries, the
+            watchlist, prices, holidays and daily history in one file. Keep it
+            somewhere safe; it isn&apos;t encrypted.
           </p>
         </div>
         <Button asChild variant="outline" className="w-fit">
@@ -103,8 +106,8 @@ export function BackupCard() {
             <strong className="font-medium text-foreground">
               replaces all current data
             </strong>{" "}
-            with the file&apos;s contents. Download the stock list and the fund
-            list above first.
+            with the file&apos;s contents. Download the stock, fund and coin
+            lists above first.
           </p>
         </div>
 
@@ -182,7 +185,7 @@ export function BackupCard() {
                 </Button>
               }
               title="Replace all data?"
-              description={`This deletes the current members, accounts, stock and mutual fund entries, prices, holidays and history, then loads the backup from ${formatDate(preview.exportedAt)}. Download your current data first if you might need it. This can't be undone.`}
+              description={`This deletes the current members, accounts, stock, mutual fund and crypto entries, watchlist, prices, holidays and history, then loads the backup from ${formatDate(preview.exportedAt)}. Download your current data first if you might need it. This can't be undone.`}
               confirmLabel="Replace all data"
               destructive
               onConfirm={confirmRestore}

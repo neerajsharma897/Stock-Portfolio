@@ -9,6 +9,7 @@ import {
   validationError,
 } from "@/lib/action-state"
 import { requireOwner } from "@/lib/auth"
+import { importCoinList } from "@/lib/crypto/coindcx"
 import { isValidIsoDate } from "@/lib/dates"
 import { formatDate, formatQuantity } from "@/lib/format"
 import { importInstruments } from "@/lib/instruments/import"
@@ -59,6 +60,27 @@ export async function updateFundList(): Promise<FormState> {
   } catch (error) {
     return actionError(
       error instanceof Error ? error.message : "Couldn't update the fund list.",
+    )
+  }
+}
+
+export async function updateCoinList(): Promise<FormState> {
+  await requireOwner()
+
+  try {
+    const { coins, deactivated } = await importCoinList(await createClient())
+    refresh()
+    const delisted =
+      deactivated > 0
+        ? ` ${formatQuantity(deactivated)} no longer traded for rupees were marked inactive.`
+        : ""
+    return {
+      status: "success",
+      message: `Coin list updated: ${formatQuantity(coins)} coins with prices.${delisted}`,
+    }
+  } catch (error) {
+    return actionError(
+      error instanceof Error ? error.message : "Couldn't update the coin list.",
     )
   }
 }

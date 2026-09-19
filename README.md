@@ -83,6 +83,29 @@ and member pages refresh prices every 5 seconds. Outside market hours prices are
 NAVs refresh automatically on weekday nights once deployed. XIRR appears once money has been invested for a year; use the
 first investment date for opening balances to get a meaningful figure.
 
+## Crypto, watchlist and news (Stage 10)
+
+1. Run `supabase/migrations/20260915150000_crypto_watchlist_news.sql` in the Supabase SQL Editor.
+2. Settings → **Crypto coin list** → **Download coin list**. It fetches every coin traded for rupees on CoinDCX (about 340)
+   with its latest price, in a few seconds. No API key is needed.
+3. Open a member → **Accounts** → add a **CoinDCX** account, then **Add crypto entry**: an opening balance with the
+   quantity and average buy price from the CoinDCX portfolio. Add buys and sells as they happen.
+4. Run `supabase/migrations/20260915170000_watchlists.sql` too. **Watchlists** → **New watchlist** (up to 10 lists, e.g.
+   "Banks", "To buy") → **Add stock** (up to 50 per list). Stocks get live Angel One prices like holdings. Tap a symbol for
+   its chart: 1 day to 5 years, line or candles. Chart history comes from Angel One when the chart opens and isn't
+   stored in Supabase, so charts need the Angel One settings from step 5 of "Running it locally".
+5. **News** shows Google News headlines for stocks held by active members and stocks on the watchlist.
+
+- **Crypto prices** refresh every 30 seconds while the Crypto page, the dashboard or a member page showing coins is open.
+  The daily snapshot fetches them too, so crypto counts in the daily history. The Crypto page also estimates this
+  financial year's crypto tax (30% plus cess on each sell's gain, losses not set off, 1% TDS).
+- **News** is searched when the News page opens (for stocks not checked in the last 30 minutes) and every morning once
+  deployed. Headlines must name the stock, so a bare ticker can miss news or pick up namesakes (RELIANCE also matches
+  Reliance Power). Pick the stock on the News page → **Change search** → enter the company name, e.g. "Reliance Industries".
+  Headlines older than 30 days are deleted.
+
+
+
 ## Deploying to Vercel (Stage 7)
 
 1. **Run the migrations** `supabase/migrations/20260914170000_scheduled_jobs.sql` and then
@@ -112,9 +135,11 @@ Defined in `vercel.json`. Times are UTC; on Vercel's free plan each job runs onc
 
 | Job | Schedule | What it does |
 |---|---|---|
-| Daily snapshot | Mon–Fri, 11:00 UTC (4:30–5:30 PM India) | Fetches closing prices from Angel One if set up, then saves each stock's close and each member's portfolio value for the day. Skips weekends and listed holidays. |
+| Daily snapshot | Mon–Fri, 11:00 UTC (4:30–5:30 PM India) | Fetches closing prices from Angel One if set up and crypto prices from CoinDCX, then saves each stock's close and each member's portfolio value for the day. Skips weekends and listed holidays. |
 | Mutual fund NAVs | Mon–Fri, 18:00 UTC (11:30 PM–12:30 AM India) | Downloads AMFI's NAV file: new funds, latest NAVs, and closed funds marked inactive. |
 | Stock list update | Mondays, 02:00 UTC (7:30–8:30 AM India) | Refreshes the stock list from Angel One's instrument file. |
+| Stock news | Every day, 01:00 UTC (6:30–7:30 AM India) | Searches Google News for held and watchlisted stocks and deletes headlines older than 30 days. |
+| Crypto coin list | Mondays, 03:00 UTC (8:30–9:30 AM India) | Refreshes CoinDCX's rupee coins with prices; coins no longer traded for rupees are marked inactive. |
 
 Vercel may occasionally skip or repeat a run; every job is safe to run again.
 
@@ -123,8 +148,9 @@ Vercel may occasionally skip or repeat a run; every job is safe to run again.
 Run `supabase/migrations/20260915100000_backup_restore.sql` first.
 
 **Download data** (Settings → Backup & restore) saves everything you've entered as one JSON file: members, accounts,
-stock transactions, mutual fund entries, prices, holidays and daily history. The stock and fund lists aren't included
-(download them again from Settings) and neither is the sign-in account. The file isn't encrypted, so keep it somewhere private.
+stock transactions, mutual fund and crypto entries, the watchlist, news search names, prices, holidays and daily history.
+The stock, fund and coin lists aren't included (download them again from Settings), nor are news headlines or the sign-in
+account. The file isn't encrypted, so keep it somewhere private.
 
 **Weekly encrypted backup:** `.github/workflows/backup.yml` runs every Sunday at 2 AM India time (or on demand from the
 repository's **Actions** tab). It downloads the same export from the live site, encrypts it with your passphrase
@@ -140,8 +166,8 @@ repository's **Actions** tab). It downloads the same export from the live site, 
 **Restore:** Settings → Backup & restore → choose a downloaded export or a backup file (GitHub downloads artifacts as a
 .zip, so unzip it first) → enter the passphrase if it's encrypted → **Check file** shows what's inside → **Replace all data**.
 Restoring replaces everything with the file's contents in one database transaction: if anything fails, nothing changes.
-Download the stock list and fund list first, since stocks are matched by exchange and code and funds by AMFI code.
-Backups made before Stage 8 still restore.
+Download the stock, fund and coin lists first, since stocks are matched by exchange and code, funds by AMFI code and coins
+by CoinDCX market (e.g. BTCINR). Backups made before Stages 8 and 10 still restore.
 
 ## Scripts
 
@@ -159,7 +185,7 @@ Backups made before Stage 8 still restore.
 ```
 app/
   (auth)/login/        Sign-in page + auth Server Actions
-  (app)/               Signed-in pages: dashboard, members, mutual-funds, crypto, alerts, settings
+  (app)/               Signed-in pages: dashboard, members, mutual-funds, crypto, watchlist, news, alerts, settings
 components/
   layout/              App shell, navigation, account menu
   ui/                  shadcn/ui components

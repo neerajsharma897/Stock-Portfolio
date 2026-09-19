@@ -1,7 +1,7 @@
 import "server-only"
 
 import { MAX_BACKUP_BYTES, parseBackupText } from "@/lib/backup/parse"
-import { fundRefs, stockRefs, type Backup } from "@/lib/backup/schema"
+import { coinRefs, fundRefs, stockRefs, type Backup } from "@/lib/backup/schema"
 import type { Json } from "@/lib/supabase/database.types"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
@@ -64,6 +64,26 @@ export async function findMissingFunds(
   }
 
   return codes.filter((code) => !known.has(code))
+}
+
+/** CoinDCX markets the backup refers to that aren't in this database's coin list. */
+export async function findMissingCoins(
+  supabase: AppSupabaseClient,
+  backup: Backup,
+): Promise<string[]> {
+  const markets = coinRefs(backup)
+  const known = new Set<string>()
+
+  for (let start = 0; start < markets.length; start += TOKEN_CHUNK) {
+    const { data, error } = await supabase
+      .from("crypto_assets")
+      .select("market")
+      .in("market", markets.slice(start, start + TOKEN_CHUNK))
+    if (error) throw new Error(`Couldn't check the coin list: ${error.message}`)
+    for (const row of data) known.add(row.market)
+  }
+
+  return markets.filter((market) => !known.has(market))
 }
 
 /** Replaces all family data with the backup, in one database transaction. */

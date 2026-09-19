@@ -5,6 +5,7 @@ import {
   formatDate,
   formatINR,
   formatPercent,
+  formatPriceINR,
   formatSignedINR,
 } from "@/lib/format"
 
@@ -32,6 +33,19 @@ describe("formatSignedINR", () => {
     expect(formatSignedINR(12340)).toBe("+₹12,340.00")
     expect(formatSignedINR(-500)).toBe("−₹500.00")
     expect(formatSignedINR(0)).toBe("₹0.00")
+  })
+})
+
+describe("formatPriceINR", () => {
+  it("shows paise for prices of a rupee or more", () => {
+    expect(formatPriceINR(7720121.2)).toBe("₹77,20,121.20")
+    expect(formatPriceINR(1)).toBe("₹1.00")
+  })
+
+  it("keeps significant digits for tiny coin prices", () => {
+    expect(formatPriceINR(0.0005154)).toBe("₹0.0005154")
+    expect(formatPriceINR(0.5)).toBe("₹0.50")
+    expect(formatPriceINR(0.000000632612)).toBe("₹0.0000006326")
   })
 })
 

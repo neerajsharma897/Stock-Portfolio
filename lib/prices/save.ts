@@ -5,20 +5,29 @@ import type { AngelOneConfig } from "@/lib/angelone/config"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 /**
- * Fetches Angel One prices for every stock that appears in a transaction and
- * saves them to instrument_prices. Used by live refresh and the daily job.
+ * Fetches Angel One prices for every stock that appears in a transaction or on
+ * the watchlist and saves them to instrument_prices. Used by live refresh and the daily job.
  */
 export async function fetchAndSavePrices(
   supabase: AppSupabaseClient,
   config: AngelOneConfig,
 ): Promise<{ saved: number; pricedAt: string | null }> {
-  const { data: rows, error } = await supabase
-    .from("transactions")
-    .select("instrument:instruments(id, exchange, token)")
-  if (error) throw new Error(`Couldn't load held stocks: ${error.message}`)
+  const [held, watched] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select("instrument:instruments(id, exchange, token)"),
+    supabase
+      .from("watchlist_items")
+      .select("instrument:instruments(id, exchange, token)"),
+  ])
+  const error = held.error ?? watched.error
+  if (error) throw new Error(`Couldn't load stocks to price: ${error.message}`)
 
   const instruments = new Map(
-    rows.map((row) => [row.instrument.id, row.instrument]),
+    [...(held.data ?? []), ...(watched.data ?? [])].map((row) => [
+      row.instrument.id,
+      row.instrument,
+    ]),
   )
   if (instruments.size === 0) return { saved: 0, pricedAt: null }
 

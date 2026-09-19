@@ -41,6 +41,20 @@ export function formatSignedINR(value: number, decimals = 2): string {
   return `${prefix}${formatINR(value, decimals)}`
 }
 
+const smallPriceFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  minimumSignificantDigits: 2,
+  maximumSignificantDigits: 4,
+})
+
+/** Coin prices from lakhs down to fractions of a paisa: ₹77,20,121.20 · ₹0.0005154 */
+export function formatPriceINR(value: number): string {
+  if (value === 0 || Math.abs(value) >= 1) return formatINR(value)
+  const formatted = smallPriceFormatter.format(Math.abs(value))
+  return value < 0 ? `${MINUS}${formatted}` : formatted
+}
+
 /** Short form for tiles and summaries: ₹12,340 · ₹24.6L · ₹1.25Cr */
 export function formatCompactINR(value: number): string {
   const abs = Math.abs(value)

@@ -1,6 +1,7 @@
 import "server-only"
 
 import { getAngelOneConfig } from "@/lib/angelone/config"
+import { fetchAndSaveCoinPrices } from "@/lib/crypto/coindcx"
 import { fetchMarketHolidays } from "@/lib/data/holidays"
 import { buildFamilyPortfolio } from "@/lib/data/portfolio"
 import type { JobOutcome } from "@/lib/jobs/run"
@@ -11,8 +12,8 @@ import { fetchAndSavePrices } from "@/lib/prices/save"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 /**
- * After the market closes: fetch closing prices (when Angel One is set up),
- * then save each stock's close and each member's portfolio for the day.
+ * After the market closes: fetch closing prices (when Angel One is set up) and
+ * crypto prices, then save each stock's close and each member's portfolio for the day.
  * Safe to run more than once a day: rows for the same date are overwritten.
  */
 export async function runDailySnapshot(
@@ -45,18 +46,26 @@ export async function runDailySnapshot(
   }
 
   const notes: string[] = []
-  let priceError: string | null = null
+  const priceErrors: string[] = []
   const config = getAngelOneConfig()
   if (config) {
     try {
       const { saved } = await fetchAndSavePrices(supabase, config)
       notes.push(`${saved} closing prices fetched from Angel One`)
     } catch (error) {
-      priceError = error instanceof Error ? error.message : String(error)
+      priceErrors.push(error instanceof Error ? error.message : String(error))
       notes.push("Angel One prices failed, so saved prices were used")
     }
   } else {
     notes.push("Angel One isn't set up, so saved prices were used")
+  }
+
+  try {
+    const { saved } = await fetchAndSaveCoinPrices(supabase)
+    if (saved > 0) notes.push(`${saved} crypto prices fetched from CoinDCX`)
+  } catch (error) {
+    priceErrors.push(error instanceof Error ? error.message : String(error))
+    notes.push("CoinDCX prices failed, so saved crypto prices were used")
   }
 
   const portfolio = await buildFamilyPortfolio(supabase)
@@ -100,8 +109,8 @@ export async function runDailySnapshot(
     `${eodRows.length} closing prices saved`,
   )
   return {
-    status: priceError ? "failed" : "success",
+    status: priceErrors.length > 0 ? "failed" : "success",
     summary: notes.join(" · "),
-    error: priceError,
+    error: priceErrors.length > 0 ? priceErrors.join(" · ") : null,
   }
 }

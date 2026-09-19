@@ -439,9 +439,10 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 7 | Deployment & scheduled jobs | Vercel | ✅ Built |
 | 7b | Export & restore | — | ✅ Built |
 | 8 | Mutual funds | — (AMFI is public) | ✅ Built |
-| 9 | Telegram alerts (launch set) | Telegram bot token | Next |
-| 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | |
-| 11 | Imports & reconciliation | CoinDCX read-only key (optional) | |
+| 9 | Telegram alerts (launch set) | Telegram bot token | Postponed |
+| 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | ✅ Built |
+| 10b | Watchlists & charts | Angel One (for chart history) | ✅ Built |
+| 11 | Imports & reconciliation | CoinDCX read-only key (optional) | Next |
 | 12 | Extras & hardening | — | |
 
 ### Stage 1: Foundation ✅
@@ -532,16 +533,36 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - **Done when:** every member's funds are entered and valued with the latest NAV
 
 ### Stage 9: Telegram alerts (launch set)
+- **Postponed** (15 Sep 2026): Stages 10–12 come first. Vercel's free cron runs once a day, so price alerts will need an external scheduler (e.g. cron-job.org) or checks during live price refreshes
 - Migrations: `alert_rules`, `alert_events`, owner Telegram settings
 - Price alerts (target, stop-loss, % move, 52-week high/low), daily 3:45 PM summary, system alerts
 - Cooldown + quiet hours; alert management page
 - **Done when:** Dad receives a test alert and the daily summary
 
-### Stage 10: Crypto, watchlist, news
-- Crypto instruments + CoinDCX ticker prices; crypto buy/sell entry
-- Watchlist page
-- News feed from Google News RSS for held and watchlisted stocks
+### Stage 10: Crypto, watchlist, news ✅
+- Migration `20260915150000_crypto_watchlist_news.sql`: `crypto_assets` (CoinDCX rupee market, symbol, name, latest price, 24-hour change), `crypto_transactions` (opening balance, buy, sell; 8-decimal quantities and 10-decimal prices for tiny coins), `watchlist_items`, `news_feeds` (search name and last check per stock), `news_articles` + `news_article_stocks`. Owner RLS, grants for the secret-key role, job names `news` and `coin-list`, and `restore_family_data` restores version 3
+- **Coins in their own table, not `instruments`** (decided when building): the stock list is keyed by Angel One exchange + token
+- **CoinDCX only, no CoinGecko fallback**: its prices match the app the coins are held in
+- Settings → **Crypto coin list** downloads CoinDCX's `markets_details` + `ticker` (checked against the live API: 338 rupee coins, prices down to ₹0.0000006); `/api/cron/coin-list` refreshes it on Mondays. Coins no longer traded for rupees are marked inactive, never deleted
+- Crypto entries on a CoinDCX (or Other) account reuse the FIFO engine; a save or delete is refused if a sell would exceed the coins held
+- Live crypto prices: pages showing coins poll `/api/crypto/refresh` every 30 seconds while visible, and CoinDCX is called at most every 30 seconds. The daily snapshot fetches them too
+- Crypto counts in family and member totals and snapshots; its 24-hour change isn't counted as "today"
+- Crypto page: value, 24-hour change, P&L and a tax estimate for the financial year (30% + 4% cess on each sell's gain, losses not set off, 1% TDS). `lib/portfolio/holdings` now records each sell's FIFO cost for this (and Stage 12's capital gains)
+- Watchlist page: stocks with a note, live Angel One prices (the refresh now includes watchlist stocks), hand-entered prices and a link to news
+- News page from Google News RSS for stocks held by active members plus the watchlist. Checked against real feeds: a bare ticker also finds namesakes and "share price today" pages, so headlines must name the stock, quote pages are dropped, and each stock's search name can be changed (e.g. "Reliance Industries"). Opening the page searches stocks not checked for 30 minutes; `/api/cron/news` runs every morning. Headlines older than 30 days are deleted. Keyword labels (Results, Dividend, Deal, Regulatory, Order, Rating) mark likely market-moving headlines
+- Stock symbols on member pages link to their news
+- Backup format version 3 adds crypto entries (by CoinDCX market), the watchlist and news search names; versions 1 and 2 still restore
+- Moved: CoinDCX trade-history CSV import to Stage 11; news alerts to Stage 12
 - **Done when:** Bitcoin value is live and each stock shows recent news
+
+### Stage 10b: Watchlists & charts ✅
+- Added on request after Stage 10
+- Migration `20260915170000_watchlists.sql`: `watchlists` (name, order), `watchlist_items` keyed by list + stock so a stock can be on several lists; stocks already on the watchlist move into "Watchlist 1". Up to 10 lists (the app checks, and an insert trigger refuses an 11th) and 50 stocks per list
+- Watchlists page: switch lists, create, rename and delete lists, add stocks with notes, remove them
+- **Charts without storing history** (decided when building, to stay inside Supabase's free tier): tapping a symbol opens a chart from Angel One's historical candle API (`getCandleData`), cached in server memory for 50 seconds (day chart) to an hour (daily candles). Ranges 1D (5-minute), 1W (15-minute), 1M (hourly), 6M/1Y/5Y (daily), all within SmartAPI's per-request limits; requests are queued under its 3-per-second limit and pause for 10 minutes after a failed login
+- Line or candlestick view with TradingView's `lightweight-charts` (loaded only when a chart opens), India-time axis labels, and the day chart follows the 5-second live price while the market is open
+- Charts need Angel One set up; without it the chart explains that
+- Backup format version 4 adds named watchlists; a version 3 watchlist restores as "Watchlist 1"
 
 ### Stage 11: Imports & reconciliation
 - Holdings/tradebook imports: Zerodha, Groww, Upstox, 5paisa, Angel One, CoinDCX

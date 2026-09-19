@@ -1,0 +1,177 @@
+import "server-only"
+
+import { loadNewsStocks, type NewsStock } from "@/lib/data/news"
+import { parseGoogleNewsRss, type NewsItem } from "@/lib/news/google-news"
+import {
+  googleNewsUrl,
+  isRelevantNews,
+  newsSearchName,
+} from "@/lib/news/relevance"
+import type { AppSupabaseClient } from "@/lib/supabase/types"
+
+/** Opening the News page searches again for stocks checked longer ago than this. */
+export const NEWS_STALE_MINUTES = 30
+
+const FETCH_TIMEOUT_MS = 15_000
+// A few searches at a time keeps Google from rate limiting a burst.
+const CONCURRENCY = 4
+// No new searches after this, so a run fits within a 60-second function.
+const TIME_BUDGET_MS = 40_000
+const KEEP_DAYS = 30
+const MAX_ARTICLES_PER_STOCK = 15
+const DAY_MS = 86_400_000
+
+export type NewsRefreshSummary = {
+  /** Stocks that get news (held or on the watchlist). */
+  stocks: number
+  searched: number
+  /** Headlines saved or updated. */
+  articles: number
+  failed: number
+  /** Due for a search but left for next time (out of time). */
+  postponed: number
+  firstError: string | null
+}
+
+/** True when a stock's news hasn't been checked within `maxAgeMinutes`. */
+export function isNewsDue(
+  checkedAt: string | null,
+  maxAgeMinutes: number,
+  now: number = Date.now(),
+): boolean {
+  return !checkedAt || Date.parse(checkedAt) < now - maxAgeMinutes * 60_000
+}
+
+async function saveArticles(
+  supabase: AppSupabaseClient,
+  instrumentId: number,
+  items: readonly NewsItem[],
+): Promise<number> {
+  // The same link twice in one upsert is an error, so keep each once.
+  const unique = [...new Map(items.map((item) => [item.url, item])).values()]
+  if (unique.length === 0) return 0
+
+  const { data, error } = await supabase
+    .from("news_articles")
+    .upsert(
+      unique.map((item) => ({
+        url: item.url,
+        title: item.title,
+        source: item.source,
+        published_at: item.publishedAt,
+      })),
+      { onConflict: "url" },
+    )
+    .select("id")
+  if (error) throw new Error(`Couldn't save headlines: ${error.message}`)
+
+  const { error: linkError } = await supabase
+    .from("news_article_stocks")
+    .upsert(
+      data.map((row) => ({ article_id: row.id, instrument_id: instrumentId })),
+      { onConflict: "article_id,instrument_id", ignoreDuplicates: true },
+    )
+  if (linkError) {
+    throw new Error(`Couldn't link headlines: ${linkError.message}`)
+  }
+  return data.length
+}
+
+/** Searches Google News for one stock, saves matching headlines and records the check. */
+async function searchStock(
+  supabase: AppSupabaseClient,
+  stock: NewsStock,
+): Promise<{ saved: number; error: string | null }> {
+  const name = newsSearchName(stock.symbol, stock.searchName)
+  let saved = 0
+  let problem: string | null = null
+
+  try {
+    const response = await fetch(googleNewsUrl(name), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
+    if (!response.ok) {
+      throw new Error(`Google News returned HTTP ${response.status}.`)
+    }
+    const oldest = Date.now() - KEEP_DAYS * DAY_MS
+    const items = parseGoogleNewsRss(await response.text())
+      .filter(
+        (item) =>
+          isRelevantNews(item, name) && Date.parse(item.publishedAt) > oldest,
+      )
+      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+      .slice(0, MAX_ARTICLES_PER_STOCK)
+    saved = await saveArticles(supabase, stock.id, items)
+  } catch (error) {
+    problem = error instanceof Error ? error.message : String(error)
+  }
+
+  // Only these columns, so a search name saved meanwhile isn't overwritten.
+  const { error } = await supabase.from("news_feeds").upsert(
+    {
+      instrument_id: stock.id,
+      checked_at: new Date().toISOString(),
+      error: problem,
+    },
+    { onConflict: "instrument_id" },
+  )
+  if (error && !problem) {
+    problem = `Couldn't save the news check: ${error.message}`
+  }
+  return { saved, error: problem }
+}
+
+/**
+ * Searches Google News for stocks not checked in the last `maxAgeMinutes`
+ * (oldest check first), then deletes headlines older than 30 days. Pass the
+ * owner's client (after requireOwner()) or the admin client in the news job.
+ */
+export async function refreshNews(
+  supabase: AppSupabaseClient,
+  {
+    maxAgeMinutes,
+    instrumentIds,
+  }: { maxAgeMinutes: number; instrumentIds?: readonly number[] },
+): Promise<NewsRefreshSummary> {
+  const started = Date.now()
+  const stocks = (await loadNewsStocks(supabase)).filter(
+    (stock) => !instrumentIds || instrumentIds.includes(stock.id),
+  )
+  const queue = stocks
+    .filter((stock) => isNewsDue(stock.checkedAt, maxAgeMinutes, started))
+    .sort((a, b) => (a.checkedAt ?? "").localeCompare(b.checkedAt ?? ""))
+  const due = queue.length
+
+  const summary: NewsRefreshSummary = {
+    stocks: stocks.length,
+    searched: 0,
+    articles: 0,
+    failed: 0,
+    postponed: 0,
+    firstError: null,
+  }
+
+  async function worker() {
+    while (queue.length > 0 && Date.now() - started < TIME_BUDGET_MS) {
+      const stock = queue.shift()!
+      const result = await searchStock(supabase, stock)
+      summary.searched += 1
+      summary.articles += result.saved
+      if (result.error) {
+        summary.failed += 1
+        summary.firstError ??= `${stock.symbol}: ${result.error}`
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+  summary.postponed = due - summary.searched
+
+  const { error } = await supabase
+    .from("news_articles")
+    .delete()
+    .lt("published_at", new Date(started - KEEP_DAYS * DAY_MS).toISOString())
+  if (error) throw new Error(`Couldn't delete old headlines: ${error.message}`)
+
+  return summary
+}

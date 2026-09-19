@@ -31,6 +31,10 @@ export async function buildBackup(
     brokerAccounts,
     transactions,
     mfTransactions,
+    cryptoTransactions,
+    watchlists,
+    watchlist,
+    newsSearches,
     instrumentPrices,
     marketHolidays,
     eodPrices,
@@ -70,6 +74,40 @@ export async function buildBackup(
           "id, member_id, broker_account_id, amfi_code, folio_number, type, units, nav, charges, trade_date, notes, created_at, updated_at",
         )
         .order("id")
+        .range(from, to),
+    ),
+    readAllRows("crypto entries", (from, to) =>
+      supabase
+        .from("crypto_transactions")
+        .select(
+          "id, member_id, broker_account_id, market, type, quantity, price, charges, trade_date, notes, created_at, updated_at",
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    readAllRows("watchlists", (from, to) =>
+      supabase
+        .from("watchlists")
+        .select("id, name, position, created_at, updated_at")
+        .order("id")
+        .range(from, to),
+    ),
+    readAllRows("watchlist stocks", (from, to) =>
+      supabase
+        .from("watchlist_items")
+        .select(
+          "watchlist_id, note, created_at, updated_at, instrument:instruments(exchange, token, symbol)",
+        )
+        .order("watchlist_id")
+        .order("instrument_id")
+        .range(from, to),
+    ),
+    readAllRows("news search names", (from, to) =>
+      supabase
+        .from("news_feeds")
+        .select("search_name, instrument:instruments(exchange, token, symbol)")
+        .not("search_name", "is", null)
+        .order("instrument_id")
         .range(from, to),
     ),
     readAllRows("prices", (from, to) =>
@@ -118,6 +156,12 @@ export async function buildBackup(
     brokerAccounts,
     transactions: transactions.map(withStockRef),
     mfTransactions,
+    cryptoTransactions,
+    watchlists,
+    watchlist: watchlist.map(withStockRef),
+    newsSearches: newsSearches.flatMap(({ search_name, ...row }) =>
+      search_name ? [{ ...withStockRef(row), search_name }] : [],
+    ),
     instrumentPrices: instrumentPrices.map(withStockRef),
     marketHolidays,
     eodPrices: eodPrices.map(withStockRef),

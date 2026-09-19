@@ -58,6 +58,11 @@ export function memberInitials(name: string): string {
   return initials || "?"
 }
 
+/** Crypto is held on CoinDCX, or on another exchange added as "Other". */
+export function canHoldCrypto(broker: Broker): boolean {
+  return broker === "coindcx" || broker === "other"
+}
+
 export function brokerAccountName(account: {
   broker: Broker
   label: string | null

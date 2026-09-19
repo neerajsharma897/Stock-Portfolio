@@ -5,6 +5,7 @@ import Link from "next/link"
 import { MemberSplit } from "@/app/(app)/dashboard/member-split"
 import { TopMovers } from "@/app/(app)/dashboard/top-movers"
 import { PageHeader } from "@/components/layout/page-header"
+import { LiveCryptoPrices } from "@/components/live-crypto-prices"
 import { LivePrices } from "@/components/live-prices"
 import { PortfolioSummaryTiles } from "@/components/portfolio-summary-tiles"
 import { Button } from "@/components/ui/button"
@@ -20,7 +21,8 @@ export default async function DashboardPage() {
     getFamilyPortfolio(),
     getLiveStatus(),
   ])
-  const { members, summary, instruments, priceItems, movers } = portfolio
+  const { members, summary, cryptoSummary, instruments, priceItems, movers } =
+    portfolio
 
   const hasActivity = summary.holdingCount > 0 || summary.realizedPnl !== 0
   if (members.length === 0 || !hasActivity) {
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
             <p className="max-w-md text-sm text-muted-foreground">
               {members.length === 0
                 ? "Add each family member and their broker accounts first."
-                : "Open a member and add an opening balance for each stock or mutual fund they hold. Family totals will appear here."}
+                : "Open a member and add an opening balance for each stock, mutual fund or coin they hold. Family totals will appear here."}
             </p>
             <Button asChild>
               <Link href="/members">Go to members</Link>
@@ -58,7 +60,8 @@ export default async function DashboardPage() {
   const membersWithProblems = members.filter(
     (memberPortfolio) =>
       memberPortfolio.problems.length > 0 ||
-      memberPortfolio.fundProblems.length > 0,
+      memberPortfolio.fundProblems.length > 0 ||
+      memberPortfolio.cryptoProblems.length > 0,
   )
 
   return (
@@ -69,6 +72,9 @@ export default async function DashboardPage() {
       >
         <div className="flex flex-wrap items-center gap-3">
           <LivePrices initialStatus={liveStatus} />
+          {cryptoSummary.holdingCount > 0 && (
+            <LiveCryptoPrices initialPricedAt={cryptoSummary.latestPricedAt} />
+          )}
           <UpdatePricesDialog items={priceItems} />
         </div>
       </PageHeader>

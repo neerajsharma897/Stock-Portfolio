@@ -2,7 +2,9 @@ import {
   BellIcon,
   ChartPieIcon,
   CoinsIcon,
+  EyeIcon,
   LayoutDashboardIcon,
+  NewspaperIcon,
   SettingsIcon,
   UsersIcon,
   type LucideIcon,
@@ -15,6 +17,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/members", label: "Members", icon: UsersIcon },
   { href: "/mutual-funds", label: "Mutual funds", icon: ChartPieIcon },
   { href: "/crypto", label: "Crypto", icon: CoinsIcon },
+  { href: "/watchlist", label: "Watchlists", icon: EyeIcon },
+  { href: "/news", label: "News", icon: NewspaperIcon },
   { href: "/alerts", label: "Alerts", icon: BellIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ]

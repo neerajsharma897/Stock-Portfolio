@@ -5,18 +5,28 @@ import {
   buildQuoteBatches,
   parseQuotes,
   type Quote,
+  type QuoteExchange,
   type QuoteRequestBody,
   type QuoteRequestItem,
 } from "@/lib/angelone/quotes"
 import { generateTotp } from "@/lib/angelone/totp"
+import {
+  parseCandles,
+  type Candle,
+  type CandleInterval,
+} from "@/lib/charts/candles"
 
-// Endpoints, headers and limits from Angel One's SmartAPI docs (User and Market Data sections).
+// Endpoints, headers and limits from Angel One's SmartAPI docs (User, Market
+// Data and Historical Data sections).
 const API_ROOT = "https://apiconnect.angelone.in"
 const LOGIN_PATH = "/rest/auth/angelbroking/user/v1/loginByPassword"
 const QUOTE_PATH = "/rest/secure/angelbroking/market/v1/quote/"
+const CANDLE_PATH = "/rest/secure/angelbroking/historical/v1/getCandleData"
 const REQUEST_TIMEOUT_MS = 15_000
 // Quotes are limited to 1 request per second.
 const QUOTE_SPACING_MS = 1_100
+// Historical candles are limited to 3 requests per second.
+const CANDLE_SPACING_MS = 400
 // Sessions last until midnight India time; renewing every few hours stays clear of that.
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000
 
@@ -146,15 +156,16 @@ async function getSession(
   return store.pendingLogin
 }
 
-// Quotes -----------------------------------------------------------------------
-
-async function requestQuotes(
+/** Posts with the cached session, logging in again and retrying once if it's rejected. */
+async function postWithSession(
   config: AngelOneConfig,
-  body: QuoteRequestBody,
-): Promise<Quote[]> {
+  path: string,
+  body: unknown,
+  { what, retryDelayMs }: { what: string; retryDelayMs: number },
+): Promise<unknown> {
   let session = await getSession(config)
-  let result = await post(QUOTE_PATH, config, body, session.jwtToken)
-  if (result.envelope?.status) return parseQuotes(result.envelope.data)
+  let result = await post(path, config, body, session.jwtToken)
+  if (result.envelope?.status) return result.envelope.data
 
   // An expired or rejected session: log in again and retry once.
   const sessionProblem =
@@ -162,14 +173,28 @@ async function requestQuotes(
     /token|session/i.test(result.envelope?.message ?? "")
   if (sessionProblem) {
     session = await getSession(config, true)
-    await sleep(QUOTE_SPACING_MS)
-    result = await post(QUOTE_PATH, config, body, session.jwtToken)
-    if (result.envelope?.status) return parseQuotes(result.envelope.data)
+    await sleep(retryDelayMs)
+    result = await post(path, config, body, session.jwtToken)
+    if (result.envelope?.status) return result.envelope.data
   }
 
   throw new AngelOneError(
-    describeFailure(result, "Angel One quote request failed"),
+    describeFailure(result, what),
     sessionProblem ? "session" : "request",
+  )
+}
+
+// Quotes -----------------------------------------------------------------------
+
+async function requestQuotes(
+  config: AngelOneConfig,
+  body: QuoteRequestBody,
+): Promise<Quote[]> {
+  return parseQuotes(
+    await postWithSession(config, QUOTE_PATH, body, {
+      what: "Angel One quote request failed",
+      retryDelayMs: QUOTE_SPACING_MS,
+    }),
   )
 }
 
@@ -184,4 +209,42 @@ export async function fetchQuotes(
     quotes.push(...(await requestQuotes(config, body)))
   }
   return quotes
+}
+
+// Historical candles -------------------------------------------------------------
+
+export type CandleRequest = {
+  exchange: QuoteExchange
+  token: string
+  interval: CandleInterval
+  /** "yyyy-MM-dd HH:mm", India time */
+  fromdate: string
+  todate: string
+}
+
+// Requests wait their turn, so several charts opening together stay under the limit.
+let candleQueue: Promise<unknown> = Promise.resolve()
+
+/** Price history for one stock, oldest candle first. */
+export function fetchCandles(
+  config: AngelOneConfig,
+  { exchange, token, interval, fromdate, todate }: CandleRequest,
+): Promise<Candle[]> {
+  const request = candleQueue.then(async () =>
+    parseCandles(
+      await postWithSession(
+        config,
+        CANDLE_PATH,
+        { exchange, symboltoken: token, interval, fromdate, todate },
+        {
+          what: "Angel One chart request failed",
+          retryDelayMs: CANDLE_SPACING_MS,
+        },
+      ),
+    ),
+  )
+  candleQueue = request
+    .catch(() => undefined)
+    .then(() => sleep(CANDLE_SPACING_MS))
+  return request
 }

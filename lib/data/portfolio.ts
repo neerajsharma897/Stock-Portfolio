@@ -2,6 +2,19 @@ import "server-only"
 
 import { requireOwner } from "@/lib/auth"
 import {
+  forFamilyTotals as cryptoForFamilyTotals,
+  groupCryptoHoldings,
+  valueCrypto,
+  type CryptoProblem,
+  type ValuedCrypto,
+} from "@/lib/crypto/portfolio"
+import {
+  fetchCryptoTransactions,
+  toCoinPrice,
+  toCryptoHoldingTransaction,
+  type Coin,
+} from "@/lib/data/crypto"
+import {
   fetchFundTransactions,
   toFundHoldingTransaction,
   toFundNav,
@@ -45,25 +58,31 @@ export type MemberPortfolio = {
   problems: HoldingProblem[]
   funds: ValuedFund[]
   fundProblems: FundProblem[]
-  /** Stocks and mutual funds together. */
+  crypto: ValuedCrypto[]
+  cryptoProblems: CryptoProblem[]
+  /** Stocks, mutual funds and crypto together. */
   summary: PortfolioSummary
   fundSummary: PortfolioSummary
   fundXirr: number | null
+  /** "Today" is the last 24 hours. */
+  cryptoSummary: PortfolioSummary
 }
 
 export type FamilyPortfolio = {
   members: MemberPortfolio[]
-  /** Stocks and mutual funds together. "Today" covers stocks only. */
+  /** Stocks, mutual funds and crypto together. "Today" covers stocks only. */
   summary: PortfolioSummary
   fundSummary: PortfolioSummary
   fundXirr: number | null
+  cryptoSummary: PortfolioSummary
   instruments: Map<number, TransactionInstrument>
   schemes: Map<number, FundScheme>
+  coins: Map<string, Coin>
   priceItems: PriceItem[]
   movers: { gainers: Mover[]; losers: Mover[] }
 }
 
-/** Every active (not archived) member's stocks and funds, valued with saved prices and NAVs. */
+/** Every active (not archived) member's stocks, funds and coins, valued with saved prices and NAVs. */
 export async function getFamilyPortfolio(): Promise<FamilyPortfolio> {
   await requireOwner()
   return buildFamilyPortfolio(await createClient())
@@ -83,21 +102,23 @@ export async function buildFamilyPortfolio(
   }
 
   const memberIds = members.map((member) => member.id)
-  const [transactions, fundTransactions] = await Promise.all([
-    memberIds.length === 0
-      ? []
-      : readAllRows("transactions", (from, to) =>
-          supabase
-            .from("transactions")
-            .select(
-              "id, type, quantity, price, charges, trade_date, created_at, broker_account_id, instrument_id, member_id, instrument:instruments(id, exchange, symbol, name, series, kind)",
-            )
-            .in("member_id", memberIds)
-            .order("id")
-            .range(from, to),
-        ),
-    fetchFundTransactions(supabase, memberIds),
-  ])
+  const [transactions, fundTransactions, cryptoTransactions] =
+    await Promise.all([
+      memberIds.length === 0
+        ? []
+        : readAllRows("transactions", (from, to) =>
+            supabase
+              .from("transactions")
+              .select(
+                "id, type, quantity, price, charges, trade_date, created_at, broker_account_id, instrument_id, member_id, instrument:instruments(id, exchange, symbol, name, series, kind)",
+              )
+              .in("member_id", memberIds)
+              .order("id")
+              .range(from, to),
+          ),
+      fetchFundTransactions(supabase, memberIds),
+      fetchCryptoTransactions(supabase, memberIds),
+    ])
 
   const instruments = new Map<number, TransactionInstrument>(
     transactions.map((transaction) => [
@@ -109,6 +130,12 @@ export async function buildFamilyPortfolio(
     fundTransactions.map((transaction) => [
       transaction.amfi_code,
       transaction.scheme,
+    ]),
+  )
+  const coins = new Map<string, Coin>(
+    cryptoTransactions.map((transaction) => [
+      transaction.market,
+      transaction.coin,
     ]),
   )
   const prices = await fetchPrices(supabase, instruments.keys())
@@ -133,15 +160,32 @@ export async function buildFamilyPortfolio(
       valueFund(holding, toFundNav(schemes.get(holding.amfiCode))),
     )
 
+    const { holdings: cryptoHoldings, problems: cryptoProblems } =
+      groupCryptoHoldings(
+        cryptoTransactions
+          .filter((transaction) => transaction.member_id === member.id)
+          .map(toCryptoHoldingTransaction),
+      )
+    const crypto = cryptoHoldings.map((holding) =>
+      valueCrypto(holding, toCoinPrice(coins.get(holding.market))),
+    )
+
     return {
       member,
       holdings: valued,
       problems,
       funds,
       fundProblems,
-      summary: summarize([...valued, ...forFamilyTotals(funds)]),
+      crypto,
+      cryptoProblems,
+      summary: summarize([
+        ...valued,
+        ...forFamilyTotals(funds),
+        ...cryptoForFamilyTotals(crypto),
+      ]),
       fundSummary: summarize(funds),
       fundXirr: combinedReturn(funds),
+      cryptoSummary: summarize(crypto),
     }
   })
 
@@ -149,13 +193,20 @@ export async function buildFamilyPortfolio(
     (portfolio) => portfolio.holdings,
   )
   const allFunds = memberPortfolios.flatMap((portfolio) => portfolio.funds)
+  const allCrypto = memberPortfolios.flatMap((portfolio) => portfolio.crypto)
   return {
     members: memberPortfolios,
-    summary: summarize([...allHoldings, ...forFamilyTotals(allFunds)]),
+    summary: summarize([
+      ...allHoldings,
+      ...forFamilyTotals(allFunds),
+      ...cryptoForFamilyTotals(allCrypto),
+    ]),
     fundSummary: summarize(allFunds),
     fundXirr: combinedReturn(allFunds),
+    cryptoSummary: summarize(allCrypto),
     instruments,
     schemes,
+    coins,
     priceItems: buildPriceItems(allHoldings, instruments),
     movers: topMovers(allHoldings),
   }

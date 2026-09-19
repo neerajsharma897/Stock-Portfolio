@@ -30,6 +30,21 @@ export type Lot = {
   costPerShare: number
 }
 
+/** One sell, matched against the oldest shares (FIFO). */
+export type Sale = {
+  transactionId: string
+  date: string
+  quantity: number
+  /** Sell price per share. */
+  price: number
+  /** Charges on the sell. */
+  charges: number
+  /** Cost of the shares sold, including their buy charges. */
+  costBasis: number
+  /** Profit or loss on this sell, after all charges. */
+  realizedPnl: number
+}
+
 export type Position = {
   quantity: number
   /** Cost of the shares still held, including buy charges. */
@@ -40,6 +55,8 @@ export type Position = {
   realizedPnl: number
   /** Shares still held, oldest first. */
   lots: Lot[]
+  /** Every sell, oldest first, e.g. for tax on each sale. */
+  sales: Sale[]
 }
 
 export type PositionResult =
@@ -76,6 +93,7 @@ export function buildPosition(
   { sellLabel = "sell" }: { sellLabel?: string } = {},
 ): PositionResult {
   const lots: Lot[] = []
+  const sales: Sale[] = []
   let realizedPnl = 0
 
   for (const transaction of sortTransactions(transactions)) {
@@ -111,8 +129,18 @@ export function buildPosition(
       if (lot.quantity <= EPSILON) lots.shift()
     }
 
-    realizedPnl +=
+    const salePnl =
       transaction.quantity * transaction.price - transaction.charges - costBasis
+    sales.push({
+      transactionId: transaction.id,
+      date: transaction.tradeDate,
+      quantity: transaction.quantity,
+      price: transaction.price,
+      charges: transaction.charges,
+      costBasis,
+      realizedPnl: salePnl,
+    })
+    realizedPnl += salePnl
   }
 
   const quantity = lots.reduce((sum, lot) => sum + lot.quantity, 0)
@@ -129,6 +157,7 @@ export function buildPosition(
       averageCost: quantity > EPSILON ? invested / quantity : 0,
       realizedPnl,
       lots,
+      sales,
     },
   }
 }

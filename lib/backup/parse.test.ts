@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { encryptBackup } from "@/lib/backup/crypto.mjs"
 import { parseBackupText } from "@/lib/backup/parse"
 import {
+  coinRefs,
   countBackup,
   fundRefs,
   stockRefs,
@@ -11,11 +12,12 @@ import {
 
 const MEMBER_ID = "3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b"
 const ACCOUNT_ID = "4a2d3b5f-6c7e-4f80-9bac-1d2e3f4a5b6c"
+const WATCHLIST_ID = "8e6b7f9d-0abc-4d24-9ef0-5b6c7d8e9fa0"
 const TIME = "2026-09-14T10:00:00+00:00"
 
 const backup: Backup = {
   app: "family-portfolio",
-  version: 2,
+  version: 4,
   exportedAt: TIME,
   members: [
     {
@@ -77,6 +79,50 @@ const backup: Backup = {
       updated_at: TIME,
     },
   ],
+  cryptoTransactions: [
+    {
+      id: "7d5a6e8c-9fab-4c13-8def-4a5b6c7d8e9f",
+      member_id: MEMBER_ID,
+      broker_account_id: ACCOUNT_ID,
+      market: "BTCINR",
+      type: "buy",
+      quantity: 0.0125,
+      price: 7720121.2,
+      charges: 12.5,
+      trade_date: "2026-09-10",
+      notes: null,
+      created_at: TIME,
+      updated_at: TIME,
+    },
+  ],
+  watchlists: [
+    {
+      id: WATCHLIST_ID,
+      name: "Banks",
+      position: 0,
+      created_at: TIME,
+      updated_at: TIME,
+    },
+  ],
+  watchlist: [
+    {
+      watchlist_id: WATCHLIST_ID,
+      exchange: "NSE",
+      token: "2885",
+      symbol: "RELIANCE",
+      note: "After results",
+      created_at: TIME,
+      updated_at: TIME,
+    },
+  ],
+  newsSearches: [
+    {
+      exchange: "NSE",
+      token: "2885",
+      symbol: "RELIANCE",
+      search_name: "Reliance Industries",
+    },
+  ],
   instrumentPrices: [
     {
       exchange: "NSE",
@@ -125,12 +171,30 @@ describe("parseBackupText", () => {
     expect(() => parseBackupText(text, "guess")).toThrow("Wrong passphrase")
   })
 
-  it("reads a version 1 backup, which has no mutual fund entries", () => {
+  it("reads a version 1 backup, which has no fund, crypto or watchlist rows", () => {
     const versionOne: Partial<Backup> = { ...backup, version: 1 }
     delete versionOne.mfTransactions
+    delete versionOne.cryptoTransactions
+    delete versionOne.watchlists
+    delete versionOne.watchlist
+    delete versionOne.newsSearches
     const result = parseBackupText(JSON.stringify(versionOne), null)
     expect(result.backup.version).toBe(1)
     expect(result.backup.mfTransactions).toEqual([])
+    expect(result.backup.cryptoTransactions).toEqual([])
+    expect(result.backup.watchlists).toEqual([])
+    expect(result.backup.watchlist).toEqual([])
+    expect(result.backup.newsSearches).toEqual([])
+  })
+
+  it("reads a version 3 backup, whose watchlist stocks have no list", () => {
+    const versionThree = structuredClone(backup) as Partial<Backup>
+    versionThree.version = 3
+    delete versionThree.watchlists
+    delete versionThree.watchlist![0].watchlist_id
+    const result = parseBackupText(JSON.stringify(versionThree), null)
+    expect(result.backup.watchlists).toEqual([])
+    expect(result.backup.watchlist[0].watchlist_id).toBeUndefined()
   })
 
   it("rejects files that aren't backups, pointing at the problem", () => {
@@ -148,13 +212,16 @@ describe("parseBackupText", () => {
   })
 })
 
-describe("countBackup and stockRefs", () => {
-  it("counts rows and lists each referenced stock once", () => {
+describe("countBackup and references", () => {
+  it("counts rows and lists each referenced stock, fund and coin once", () => {
     expect(countBackup(backup)).toEqual({
       members: 1,
       brokerAccounts: 1,
       transactions: 1,
       fundEntries: 1,
+      cryptoEntries: 1,
+      watchlists: 1,
+      watchlist: 1,
       prices: 1,
       holidays: 1,
       closingPrices: 1,
@@ -163,7 +230,9 @@ describe("countBackup and stockRefs", () => {
     expect(stockRefs(backup)).toEqual([
       { exchange: "NSE", token: "11536", symbol: "TCS" },
       { exchange: "BSE", token: "500325", symbol: "RELIANCE" },
+      { exchange: "NSE", token: "2885", symbol: "RELIANCE" },
     ])
     expect(fundRefs(backup)).toEqual([122639])
+    expect(coinRefs(backup)).toEqual(["BTCINR"])
   })
 })

@@ -1,4 +1,5 @@
 import { TriangleAlertIcon } from "lucide-react"
+import Link from "next/link"
 
 import {
   TransactionDialog,
@@ -153,7 +154,13 @@ export function HoldingsCard({
                       key={`${holding.brokerAccountId}:${holding.instrumentId}`}
                     >
                       <td className="px-4 py-2.5">
-                        <div className="font-medium">{symbolOf(holding)}</div>
+                        <Link
+                          href={`/news?stock=${holding.instrumentId}`}
+                          className="font-medium underline-offset-4 hover:underline"
+                        >
+                          {symbolOf(holding)}
+                          <span className="sr-only"> news</span>
+                        </Link>
                         <div className="text-xs text-muted-foreground">
                           {instrument?.exchange}
                           {instrument?.kind === "sgb" && " · Gold bond"}
