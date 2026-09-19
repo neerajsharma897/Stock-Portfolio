@@ -67,6 +67,23 @@ export function isLongTerm(
   return sold > anniversary
 }
 
+/** The first date a sale counts as long-term (the day after the anniversary). */
+export function longTermOn(bought: string, months: number): string {
+  const [year, month, day] = bought.split("-").map(Number)
+  const total = year * 12 + (month - 1) + months
+  const anniversaryYear = Math.floor(total / 12)
+  const anniversaryMonth = total % 12
+  // Day 0 of the next month is the last day of this one (29 Feb → 28 Feb).
+  const lastDay = new Date(
+    Date.UTC(anniversaryYear, anniversaryMonth + 1, 0),
+  ).getUTCDate()
+  const next =
+    day >= lastDay
+      ? new Date(Date.UTC(anniversaryYear, anniversaryMonth + 1, 1))
+      : new Date(Date.UTC(anniversaryYear, anniversaryMonth, day + 1))
+  return next.toISOString().slice(0, 10)
+}
+
 /** One line per sale and holding term. */
 export function gainLines(
   sale: Sale,

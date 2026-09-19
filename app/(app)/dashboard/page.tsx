@@ -1,18 +1,35 @@
 import { LayoutDashboardIcon, TriangleAlertIcon } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { AssetSplit } from "@/app/(app)/dashboard/asset-split"
 import { MemberSplit } from "@/app/(app)/dashboard/member-split"
+import {
+  NiftyComparison,
+  NiftyComparisonSkeleton,
+} from "@/app/(app)/dashboard/nifty-comparison"
 import { TopMovers } from "@/app/(app)/dashboard/top-movers"
 import { PageHeader } from "@/components/layout/page-header"
 import { LiveCryptoPrices } from "@/components/live-crypto-prices"
 import { LivePrices } from "@/components/live-prices"
 import { PortfolioSummaryTiles } from "@/components/portfolio-summary-tiles"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { UpdatePricesDialog } from "@/components/update-prices-dialog"
+import {
+  ValueHistoryChart,
+  type HistoryPoint,
+} from "@/components/value-history-chart"
+import { getValueHistory } from "@/lib/data/insights"
 import { getFamilyPortfolio } from "@/lib/data/portfolio"
+import { overallReturn } from "@/lib/portfolio/overall-return"
 import { getLiveStatus } from "@/lib/prices/live"
 
 export const metadata: Metadata = { title: "Dashboard" }
@@ -66,6 +83,27 @@ export default async function DashboardPage() {
     )
   }
 
+  // Daily snapshots, plus today's value while it's a trading day.
+  const history: HistoryPoint[] = await getValueHistory(
+    members.map(({ member }) => member.id),
+  )
+  const market = liveStatus.market
+  if (market.reason === "open" || market.reason === "after_close") {
+    const today = {
+      date: market.date,
+      value: summary.currentValue,
+      invested: summary.invested,
+    }
+    if (history.at(-1)?.date === market.date)
+      history[history.length - 1] = today
+    else history.push(today)
+  }
+
+  const stockHoldings = members.flatMap((portfolio) => portfolio.holdings)
+  const stockSummary = assetClasses.find(
+    (assetClass) => assetClass.key === "stocks",
+  )?.summary
+
   const membersWithProblems = members.filter(
     (memberPortfolio) =>
       memberPortfolio.problems.length > 0 ||
@@ -116,6 +154,46 @@ export default async function DashboardPage() {
       )}
 
       <PortfolioSummaryTiles summary={summary} xirr={xirr} />
+
+      <div className="mt-2 grid gap-2 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Family value over time</CardTitle>
+            <CardDescription>
+              Everything together at each trading day&apos;s close, from the
+              daily snapshots.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {history.length < 2 ? (
+              <p className="text-sm text-muted-foreground">
+                The chart fills in as the daily snapshot runs after each trading
+                day.
+              </p>
+            ) : (
+              <ValueHistoryChart points={history} />
+            )}
+          </CardContent>
+        </Card>
+        {stockSummary && stockSummary.holdingCount > 0 && (
+          <Suspense fallback={<NiftyComparisonSkeleton />}>
+            <NiftyComparison
+              flows={stockHoldings.flatMap((holding) => holding.flows)}
+              stockValue={stockSummary.currentValue}
+              stockXirr={overallReturn(
+                {
+                  holdings: stockHoldings,
+                  funds: [],
+                  crypto: [],
+                  deposits: [],
+                },
+                market.date,
+              )}
+              allPriced={stockSummary.pricedCount === stockSummary.holdingCount}
+            />
+          </Suspense>
+        )}
+      </div>
 
       <div className="mt-2 grid gap-2 lg:grid-cols-3">
         <div className="lg:col-span-2">

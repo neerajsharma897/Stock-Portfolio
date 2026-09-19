@@ -255,7 +255,7 @@ export async function buildFamilyPortfolio(
     ),
   }
   const classes: Omit<AssetClass, "summary">[] = [
-    { key: "stocks", label: "Stocks", href: null },
+    { key: "stocks", label: "Stocks", href: "/stocks" },
     { key: "funds", label: "Mutual funds", href: "/mutual-funds" },
     { key: "crypto", label: "Crypto", href: "/crypto" },
     { key: "deposits", label: "Fixed deposits", href: "/other-assets" },

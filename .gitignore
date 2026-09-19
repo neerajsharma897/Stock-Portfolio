@@ -44,3 +44,6 @@ next-env.d.ts
 #agent
 claude.md
 agents.md
+
+# Broker exports and CAS PDFs used to build the Stage 11 imports (personal data)
+/samples/

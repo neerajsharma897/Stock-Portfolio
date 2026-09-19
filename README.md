@@ -131,6 +131,24 @@ first investment date for opening balances to get a meaningful figure.
 XIRR now shows per stock and coin, and on the summary tiles for each member and the family once money has been invested
 for a year and every holding has a price.
 
+## Stocks page and insights
+
+1. Run `supabase/migrations/20260921090000_stock_sectors.sql` in the Supabase SQL Editor, then open **Stocks** and
+   press **Download sectors** once. The weekly stock list job keeps them up to date.
+2. **Stocks** lists every stock once for the whole family, with who holds how much, and below it:
+   - **By sector**: from NSE's Nifty Total Market list (about 750 companies). Stocks outside it (small companies, ETFs,
+     BSE-only) show as "Not classified"; the pencil sets their sector by hand, and the weekly update keeps that.
+   - **Concentration**: the largest stock and top 5 as a share of all stocks, and a note for any stock over 20%.
+   - **By broker**: value per broker, with the members and accounts.
+   - **Short- and long-term**: value held over and under 12 months, and lots turning long-term in the next 60 days.
+   - **Tax-free gains**: each member's ₹1.25 lakh yearly tax-free limit on long-term gains (shares and equity funds),
+     how much is used this financial year, and how much of today's long-term gains would still fit.
+   - **Money put in each month**: buys and sells per month, up to two years.
+3. **Dashboard**: the family's value over time (from the daily snapshots; it fills in as they're saved), and the stocks
+   against the Nifty 50: every buy and sell repeated on the index on the same day. The index history comes from Angel
+   One when the page opens and isn't stored.
+4. **Mutual funds**: value by AMFI category (equity, debt, hybrid and so on, with large, mid and small cap).
+
 ## Telegram alerts (Stage 9)
 
 1. Run `supabase/migrations/20260920090000_telegram_alerts.sql` in the Supabase SQL Editor.
@@ -148,7 +166,7 @@ for a year and every holding has a price.
 
 **How often prices are checked.** Vercel's free plan runs a scheduled job only once a day, so:
 
-- While the dashboard, a member page or the watchlist is open in market hours, alerts are checked with the live prices,
+- While the dashboard, the Stocks page, a member page or a watchlist is open in market hours, alerts are checked with the live prices,
   at most once a minute.
 - The **Alerts** job (Mon–Fri, 3:30–4:30 PM India) checks alerts on closing prices and sends the daily summary. The
   daily snapshot job sends the summary too if the alerts job didn't.
@@ -192,7 +210,7 @@ Defined in `vercel.json`. Times are UTC; on Vercel's free plan each job runs onc
 |---|---|---|
 | Daily snapshot | Mon–Fri, 11:00 UTC (4:30–5:30 PM India) | Fetches closing prices from Angel One if set up and crypto prices from CoinDCX, then saves each stock's close and each member's portfolio value for the day. Skips weekends and listed holidays. |
 | Mutual fund NAVs | Mon–Fri, 18:00 UTC (11:30 PM–12:30 AM India) | Downloads AMFI's NAV file: new funds, latest NAVs, and closed funds marked inactive. |
-| Stock list update | Mondays, 02:00 UTC (7:30–8:30 AM India) | Refreshes the stock list from Angel One's instrument file. |
+| Stock list update | Mondays, 02:00 UTC (7:30–8:30 AM India) | Refreshes the stock list from Angel One's instrument file, and stock sectors from NSE. |
 | Stock news | Every day, 01:00 UTC (6:30–7:30 AM India) | Searches Google News for held and watchlisted stocks and deletes headlines older than 14 days or for stocks no longer followed. |
 | Alerts | Mon–Fri, 10:00 UTC (3:30–4:30 PM India) | Checks price alerts on the latest prices and sends the Telegram daily summary after the close. See Telegram alerts for checks during the day. |
 | Crypto coin list | Mondays, 03:00 UTC (8:30–9:30 AM India) | Refreshes CoinDCX's rupee coins with prices; coins no longer traded for rupees are marked inactive. |

@@ -1,5 +1,6 @@
 import {
   BellIcon,
+  ChartCandlestickIcon,
   ChartPieIcon,
   CoinsIcon,
   EyeIcon,
@@ -17,6 +18,7 @@ export type NavItem = { href: string; label: string; icon: LucideIcon }
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
   { href: "/members", label: "Members", icon: UsersIcon },
+  { href: "/stocks", label: "Stocks", icon: ChartCandlestickIcon },
   { href: "/mutual-funds", label: "Mutual funds", icon: ChartPieIcon },
   { href: "/crypto", label: "Crypto", icon: CoinsIcon },
   { href: "/other-assets", label: "FDs & other assets", icon: PiggyBankIcon },

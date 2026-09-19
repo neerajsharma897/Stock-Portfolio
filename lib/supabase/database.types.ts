@@ -961,6 +961,27 @@ export type Database = {
           },
         ]
       }
+      stock_sectors: {
+        Row: {
+          sector: string
+          source: string
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          sector: string
+          source?: string
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          sector?: string
+          source?: string
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       telegram_settings: {
         Row: {
           chat_id: number | null
@@ -1152,7 +1173,8 @@ export type Database = {
         | "fivepaisa"
         | "coindcx"
         | "other"
-      alert_kind: "price_above" | "price_below" | "day_move" | "high_52w" | "low_52w"
+      alert_kind:
+        "price_above" | "price_below" | "day_move" | "high_52w" | "low_52w"
       corporate_action_kind: "split" | "bonus"
       exchange: "NSE" | "BSE"
       fd_interest: "quarterly" | "monthly" | "half_yearly" | "yearly" | "payout"

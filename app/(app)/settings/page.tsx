@@ -135,7 +135,8 @@ function LivePricesCard({ status }: { status: LiveStatus }) {
           ? ` · ${badge.detail}`
           : ""}
         . Prices refresh every 5 seconds during market hours (Mon–Fri, 9:15
-        AM–3:30 PM India time) while the dashboard or a member page is open.
+        AM–3:30 PM India time) while the dashboard, the Stocks page, a member
+        page or a watchlist is open.
       </p>
     </div>
   )

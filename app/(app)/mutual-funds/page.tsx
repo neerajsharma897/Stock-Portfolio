@@ -5,6 +5,7 @@ import Link from "next/link"
 import { FundName } from "@/components/fund-name"
 import { PageHeader } from "@/components/layout/page-header"
 import { MemberAvatar } from "@/components/member-avatar"
+import { ShareList } from "@/components/share-list"
 import { StatTile, toneOf, toneTextClass } from "@/components/stat-tile"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +22,7 @@ import {
   formatPercent,
   formatSignedINR,
 } from "@/lib/format"
+import { categorySplit } from "@/lib/mutual-funds/categories"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = { title: "Mutual funds" }
@@ -85,6 +87,12 @@ export default async function MutualFundsPage() {
   )
   const latestNavDate = navDates.length > 0 ? navDates.sort().at(-1)! : null
   const valued = fundSummary.pricedCount > 0
+  const categories = categorySplit(
+    rows.map((row) => ({
+      category: row.scheme?.category ?? null,
+      value: row.fund.currentValue,
+    })),
+  )
 
   return (
     <>
@@ -180,6 +188,38 @@ export default async function MutualFundsPage() {
               ratio; the Direct plan of the same fund doesn&apos;t. They&apos;re
               marked &ldquo;Regular&rdquo; below.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {categories.length > 0 && (
+        <Card className="mt-2">
+          <CardHeader>
+            <CardTitle>By category</CardTitle>
+            <CardDescription>
+              AMFI&apos;s fund types, by current value.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ShareList
+              shareOf="of the family's mutual funds"
+              rows={categories.map((group) => ({
+                key: group.name,
+                label: group.name,
+                value: formatINR(group.value, 0),
+                pct: group.weightPct,
+                detail:
+                  group.categories.length > 1 ||
+                  group.categories[0]?.name !== group.name
+                    ? group.categories
+                        .map(
+                          (category) =>
+                            `${category.name} ${formatPercent(category.weightPct, { decimals: 0, signed: false })}`,
+                        )
+                        .join(" · ")
+                    : undefined,
+              }))}
+            />
           </CardContent>
         </Card>
       )}

@@ -128,9 +128,18 @@ export async function runDailySnapshot(
   const cutoff = (days: number) =>
     new Date(Date.now() - days * DAY_MS).toISOString()
   const pruned = await Promise.all([
-    supabase.from("audit_log").delete().lt("changed_at", cutoff(AUDIT_KEEP_DAYS)),
-    supabase.from("alert_events").delete().lt("sent_at", cutoff(ALERTS_KEEP_DAYS)),
-    supabase.from("job_runs").delete().lt("started_at", cutoff(JOB_RUNS_KEEP_DAYS)),
+    supabase
+      .from("audit_log")
+      .delete()
+      .lt("changed_at", cutoff(AUDIT_KEEP_DAYS)),
+    supabase
+      .from("alert_events")
+      .delete()
+      .lt("sent_at", cutoff(ALERTS_KEEP_DAYS)),
+    supabase
+      .from("job_runs")
+      .delete()
+      .lt("started_at", cutoff(JOB_RUNS_KEEP_DAYS)),
   ])
   const pruneError = pruned.find((result) => result.error)?.error
   if (pruneError) {

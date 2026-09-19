@@ -32,10 +32,7 @@ export async function fetchAndSavePrices(
       ...(held.data ?? []),
       ...(watched.data ?? []),
       ...(alerted.data ?? []),
-    ].map((row) => [
-      row.instrument.id,
-      row.instrument,
-    ]),
+    ].map((row) => [row.instrument.id, row.instrument]),
   )
   if (instruments.size === 0) return { saved: 0, pricedAt: null }
 

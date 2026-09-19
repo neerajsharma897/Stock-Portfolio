@@ -215,9 +215,10 @@ export default async function AlertsPage() {
           </CardHeader>
           <CardContent className="grid gap-2 text-sm text-muted-foreground">
             <p>
-              While the dashboard, a member page or the watchlist is open in
-              market hours, price alerts are checked every minute. The daily
-              summary goes out once after the close, between 3:30 and 4:30 PM.
+              While the dashboard, the Stocks page, a member page or a watchlist
+              is open in market hours, price alerts are checked every minute.
+              The daily summary goes out once after the close, between 3:30 and
+              4:30 PM.
             </p>
             <p>
               To get price alerts with the app closed, set up a free scheduler

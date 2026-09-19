@@ -442,8 +442,9 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 9 | Telegram alerts (launch set) | Telegram bot token | ✅ Built |
 | 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | ✅ Built |
 | 10b | Watchlists & charts | Angel One (for chart history) | ✅ Built |
-| 11 | Imports & reconciliation | CoinDCX read-only key (optional) | Next |
+| 11 | Imports & reconciliation | CoinDCX read-only key (optional) | Skipped for now |
 | 12 | Extras & hardening | — | ✅ Built |
+| 13 | Stocks page & insights | — | ✅ Built |
 
 ### Stage 1: Foundation ✅
 - Next.js 16 + TypeScript + Tailwind 4 + shadcn/ui, ESLint, Prettier, Vitest
@@ -571,6 +572,7 @@ Built after Stages 10–12 (postponed on 15 Sep 2026, built 19 Sep 2026).
 - Backup format version 4 adds named watchlists; a version 3 watchlist restores as "Watchlist 1"
 
 ### Stage 11: Imports & reconciliation
+- **Skipped for now** (19 Sep 2026): holdings are entered by hand. Needs one CAS PDF and one holdings export per broker when picked up again; broker APIs mostly need a daily manual login, so files are the practical route
 - Holdings/tradebook imports: Zerodha, Groww, Upstox, 5paisa, Angel One, CoinDCX
 - NSDL/CDSL CAS upload with mismatch report
 - Angel One holdings auto-sync; CoinDCX balance sync (read-only key)
@@ -597,6 +599,15 @@ Fixes first: on phones, hidden screen-reader labels inside table cells escaped t
 - Migration `20260919150000_mfa_audit_log.sql`: `owner_access()` returns owner / needs_mfa / not_owner; `is_owner()` (every RLS policy) now requires Supabase's aal2 once an authenticator app is set up, so a stolen password alone can't read data. Settings → Two-step sign-in adds or removes the app (TOTP); sign-in then asks for the code at `/verify`
 - Install on the phone: `app/manifest.ts`, generated icons (`/icons/*.png`, `apple-icon`), readable without a session. No service worker: the app needs the network for prices anyway
 - `audit_log` filled by triggers on the family-data tables (not prices or news); a restore is one entry. The daily snapshot deletes entries older than a year. Settings shows the last 30 changes. Restore rows now live in `restore_family_rows`; `restore_family_data` wraps it
+
+### Stage 13: Stocks page & insights ✅
+Asked for on 19 Sep 2026 after Stage 11 was skipped; the user picked these from a list of ideas.
+- **Stocks page**: every stock once for the family (members and accounts combined), who holds how many, weight, P&L and XIRR, chart on the name; by member; today's movers. On the menu and linked from the dashboard's asset split
+- Migration `20260921090000_stock_sectors.sql`: `stock_sectors` (symbol, sector, source nse/manual, ~750 rows). Filled from NSE's Nifty Total Market list (niftyindices.com, NSE archive as fallback) by the weekly stock-list job or the Stocks page button; sectors set by hand are never overwritten. Looked up by symbol, so NSE and BSE listings share one. Gold bonds are their own group. Not in backups: NSE's rows come back with the next update
+- Stocks page cards: sector breakdown, concentration (largest, top 5, "spread like N equal stocks", note above 20%), broker split, short/long-term split with lots turning long-term in 60 days, each member's ₹1.25 lakh tax-free long-term gains (booked this FY vs held now, shares and equity funds), money put in and taken out per month
+- Dashboard: family value over time from `portfolio_snapshots` (plus today's value on trading days), and stocks vs Nifty 50: every stock cash flow repeated on the index at that day's close, from Angel One's daily candles held in memory for 3 hours (nothing stored); streams in so the dashboard doesn't wait
+- Mutual funds: value by AMFI category group and category
+- Not picked (for later): market-cap split, 52-week range bars, heatmap, gain/loss chart, tax-loss candidates, upcoming FDs/IPOs, today's change by asset type, dividends
 
 ---
 

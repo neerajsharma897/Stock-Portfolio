@@ -4,6 +4,7 @@ import { isAuthorizedCronRequest } from "@/lib/cron"
 import { formatQuantity } from "@/lib/format"
 import { importInstruments } from "@/lib/instruments/import"
 import { runJob } from "@/lib/jobs/run"
+import { refreshSectors } from "@/lib/sectors/refresh"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // Downloads a ~33 MB file and saves thousands of rows. 300 seconds is the
@@ -24,9 +25,16 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient()
   const outcome = await runJob(supabase, "stock-list", async () => {
     const { imported, deactivated } = await importInstruments(supabase)
+    // Sectors are a nice-to-have: a failed download doesn't fail the stock list.
+    let sectors: string
+    try {
+      sectors = `${formatQuantity(await refreshSectors(supabase))} sectors updated`
+    } catch (error) {
+      sectors = `sectors not updated (${error instanceof Error ? error.message : String(error)})`
+    }
     return {
       status: "success",
-      summary: `${formatQuantity(imported)} entries saved · ${formatQuantity(deactivated)} marked inactive`,
+      summary: `${formatQuantity(imported)} entries saved · ${formatQuantity(deactivated)} marked inactive · ${sectors}`,
     }
   })
   return Response.json(outcome, {

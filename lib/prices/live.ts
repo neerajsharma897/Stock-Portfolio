@@ -116,7 +116,8 @@ export async function refreshLivePrices(): Promise<LiveStatus> {
 /** Checks price alerts after fresh prices, at most once a minute. Never throws. */
 async function checkAlertsNow() {
   const store = refreshStore()
-  if (Date.now() - (store.alertsCheckedAt ?? 0) < ALERT_CHECK_INTERVAL_MS) return
+  if (Date.now() - (store.alertsCheckedAt ?? 0) < ALERT_CHECK_INTERVAL_MS)
+    return
   store.alertsCheckedAt = Date.now()
   try {
     await checkPriceAlerts(await createClient())
