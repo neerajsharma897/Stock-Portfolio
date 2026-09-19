@@ -1,5 +1,6 @@
 import "server-only"
 
+import { sendDailySummary } from "@/lib/alerts/run"
 import { getAngelOneConfig } from "@/lib/angelone/config"
 import { fetchAndSaveCoinPrices } from "@/lib/crypto/coindcx"
 import { fetchMarketHolidays } from "@/lib/data/holidays"
@@ -12,6 +13,9 @@ import { fetchAndSavePrices } from "@/lib/prices/save"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 const AUDIT_KEEP_DAYS = 366
+const ALERTS_KEEP_DAYS = 90
+const JOB_RUNS_KEEP_DAYS = 60
+const DAY_MS = 86_400_000
 
 /**
  * After the market closes: fetch closing prices (when Angel One is set up) and
@@ -111,16 +115,26 @@ export async function runDailySnapshot(
     `${eodRows.length} closing prices saved`,
   )
 
-  // The audit log keeps a year of changes.
-  const { error: auditError } = await supabase
-    .from("audit_log")
-    .delete()
-    .lt(
-      "changed_at",
-      new Date(Date.now() - AUDIT_KEEP_DAYS * 86_400_000).toISOString(),
+  // In case the alerts job didn't run after the close.
+  try {
+    notes.push(await sendDailySummary(supabase))
+  } catch (error) {
+    notes.push(
+      `daily summary failed (${error instanceof Error ? error.message : String(error)})`,
     )
-  if (auditError) {
-    notes.push(`old audit entries weren't deleted (${auditError.message})`)
+  }
+
+  // Keep a year of audit entries, 90 days of alerts and 60 days of job runs.
+  const cutoff = (days: number) =>
+    new Date(Date.now() - days * DAY_MS).toISOString()
+  const pruned = await Promise.all([
+    supabase.from("audit_log").delete().lt("changed_at", cutoff(AUDIT_KEEP_DAYS)),
+    supabase.from("alert_events").delete().lt("sent_at", cutoff(ALERTS_KEEP_DAYS)),
+    supabase.from("job_runs").delete().lt("started_at", cutoff(JOB_RUNS_KEEP_DAYS)),
+  ])
+  const pruneError = pruned.find((result) => result.error)?.error
+  if (pruneError) {
+    notes.push(`old entries weren't deleted (${pruneError.message})`)
   }
   return {
     status: priceErrors.length > 0 ? "failed" : "success",

@@ -13,6 +13,88 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      alert_events: {
+        Row: {
+          delivered: boolean
+          error: string | null
+          id: number
+          kind: string
+          message: string
+          rule_id: string | null
+          sent_at: string
+        }
+        Insert: {
+          delivered: boolean
+          error?: string | null
+          id?: never
+          kind: string
+          message: string
+          rule_id?: string | null
+          sent_at?: string
+        }
+        Update: {
+          delivered?: boolean
+          error?: string | null
+          id?: number
+          kind?: string
+          message?: string
+          rule_id?: string | null
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_events_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_rules: {
+        Row: {
+          created_at: string
+          id: string
+          instrument_id: number
+          is_active: boolean
+          kind: Database["public"]["Enums"]["alert_kind"]
+          last_triggered_at: string | null
+          note: string | null
+          threshold: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instrument_id: number
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["alert_kind"]
+          last_triggered_at?: string | null
+          note?: string | null
+          threshold?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instrument_id?: number
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["alert_kind"]
+          last_triggered_at?: string | null
+          note?: string | null
+          threshold?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_rules_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: false
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_owner: {
         Row: {
           created_at: string
@@ -448,6 +530,8 @@ export type Database = {
           priced_at: string
           source: Database["public"]["Enums"]["price_source"]
           updated_at: string
+          week52_high: number | null
+          week52_low: number | null
         }
         Insert: {
           instrument_id: number
@@ -456,6 +540,8 @@ export type Database = {
           priced_at?: string
           source?: Database["public"]["Enums"]["price_source"]
           updated_at?: string
+          week52_high?: number | null
+          week52_low?: number | null
         }
         Update: {
           instrument_id?: number
@@ -464,6 +550,8 @@ export type Database = {
           priced_at?: string
           source?: Database["public"]["Enums"]["price_source"]
           updated_at?: string
+          week52_high?: number | null
+          week52_low?: number | null
         }
         Relationships: [
           {
@@ -873,6 +961,51 @@ export type Database = {
           },
         ]
       }
+      telegram_settings: {
+        Row: {
+          chat_id: number | null
+          chat_name: string | null
+          created_at: string
+          daily_summary: boolean
+          link_code: string | null
+          link_code_expires_at: string | null
+          quiet_end: string
+          quiet_start: string
+          singleton: boolean
+          summary_sent_on: string | null
+          system_alerts: boolean
+          updated_at: string
+        }
+        Insert: {
+          chat_id?: number | null
+          chat_name?: string | null
+          created_at?: string
+          daily_summary?: boolean
+          link_code?: string | null
+          link_code_expires_at?: string | null
+          quiet_end?: string
+          quiet_start?: string
+          singleton?: boolean
+          summary_sent_on?: string | null
+          system_alerts?: boolean
+          updated_at?: string
+        }
+        Update: {
+          chat_id?: number | null
+          chat_name?: string | null
+          created_at?: string
+          daily_summary?: boolean
+          link_code?: string | null
+          link_code_expires_at?: string | null
+          quiet_end?: string
+          quiet_start?: string
+          singleton?: boolean
+          summary_sent_on?: string | null
+          system_alerts?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           broker_account_id: string
@@ -1019,6 +1152,7 @@ export type Database = {
         | "fivepaisa"
         | "coindcx"
         | "other"
+      alert_kind: "price_above" | "price_below" | "day_move" | "high_52w" | "low_52w"
       corporate_action_kind: "split" | "bonus"
       exchange: "NSE" | "BSE"
       fd_interest: "quarterly" | "monthly" | "half_yearly" | "yearly" | "payout"

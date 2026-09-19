@@ -14,6 +14,8 @@ export type Quote = {
   lastPrice: number
   /** SmartAPI's `close`: the previous trading day's close. */
   previousClose: number | null
+  week52High: number | null
+  week52Low: number | null
 }
 
 /** SmartAPI returns data for at most 50 tokens per quote request. */
@@ -57,10 +59,14 @@ export function parseQuotes(data: unknown): Quote[] {
   const quotes: Quote[] = []
   for (const entry of fetched) {
     if (!entry || typeof entry !== "object") continue
-    const { exchange, symbolToken, ltp, close } = entry as Record<
-      string,
-      unknown
-    >
+    const {
+      exchange,
+      symbolToken,
+      ltp,
+      close,
+      "52WeekHigh": week52High,
+      "52WeekLow": week52Low,
+    } = entry as Record<string, unknown>
     if (exchange !== "NSE" && exchange !== "BSE") continue
     if (typeof symbolToken !== "string" || symbolToken === "") continue
     const lastPrice = positiveNumber(ltp)
@@ -70,6 +76,8 @@ export function parseQuotes(data: unknown): Quote[] {
       token: symbolToken,
       lastPrice,
       previousClose: positiveNumber(close),
+      week52High: positiveNumber(week52High),
+      week52Low: positiveNumber(week52Low),
     })
   }
   return quotes

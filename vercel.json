@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/coin-list",
       "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/cron/alerts",
+      "schedule": "0 10 * * 1-5"
     }
   ]
 }

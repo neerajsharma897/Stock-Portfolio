@@ -59,6 +59,8 @@ describe("parseQuotes", () => {
           close: 567.4,
           netChange: 0.8,
           percentChange: 0.14,
+          "52WeekLow": 430.4,
+          "52WeekHigh": 629.55,
         },
       ],
       unfetched: [],
@@ -69,6 +71,8 @@ describe("parseQuotes", () => {
         token: "3045",
         lastPrice: 568.2,
         previousClose: 567.4,
+        week52High: 629.55,
+        week52Low: 430.4,
       },
     ])
   })
@@ -88,6 +92,8 @@ describe("parseQuotes", () => {
         exchange: "BSE",
         token: "500325",
         lastPrice: 1400.5,
+        week52High: null,
+        week52Low: null,
         previousClose: null,
       },
     ])

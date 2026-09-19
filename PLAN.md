@@ -439,11 +439,11 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 7 | Deployment & scheduled jobs | Vercel | ✅ Built |
 | 7b | Export & restore | — | ✅ Built |
 | 8 | Mutual funds | — (AMFI is public) | ✅ Built |
-| 9 | Telegram alerts (launch set) | Telegram bot token | Postponed |
+| 9 | Telegram alerts (launch set) | Telegram bot token | ✅ Built |
 | 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | ✅ Built |
 | 10b | Watchlists & charts | Angel One (for chart history) | ✅ Built |
 | 11 | Imports & reconciliation | CoinDCX read-only key (optional) | Next |
-| 12 | Extras & hardening (alerts part waits for Stage 9) | — | ✅ Built |
+| 12 | Extras & hardening | — | ✅ Built |
 
 ### Stage 1: Foundation ✅
 - Next.js 16 + TypeScript + Tailwind 4 + shadcn/ui, ESLint, Prettier, Vitest
@@ -532,11 +532,17 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - No separate `sips` table or NAV history: SIP reminders move to Stage 12, NAV history to Stage 12 (charts)
 - **Done when:** every member's funds are entered and valued with the latest NAV
 
-### Stage 9: Telegram alerts (launch set)
-- **Postponed** (15 Sep 2026): Stages 10–12 come first. Vercel's free cron runs once a day, so price alerts will need an external scheduler (e.g. cron-job.org) or checks during live price refreshes
-- Migrations: `alert_rules`, `alert_events`, owner Telegram settings
-- Price alerts (target, stop-loss, % move, 52-week high/low), daily 3:45 PM summary, system alerts
-- Cooldown + quiet hours; alert management page
+### Stage 9: Telegram alerts (launch set) ✅
+Built after Stages 10–12 (postponed on 15 Sep 2026, built 19 Sep 2026).
+- Migration `20260920090000_telegram_alerts.sql`: `telegram_settings` (one row: chat, one-time link code, daily summary and problem alerts on/off, quiet hours, date of the last summary), `alert_rules` (stock, kind, threshold, note, paused, last sent), `alert_events` (every message sent or held back, kept 90 days), 52-week high/low on `instrument_prices`, job name `alerts`. Owner RLS; the secret-key role reads settings and rules and writes events
+- **No chat ID to look up** (decided when building): Connect Telegram makes a one-time `t.me/<bot>?start=<code>` link that expires after 15 minutes; the app finds that Start message with `getUpdates` and saves the chat. No webhook, so no public endpoint for Telegram to call
+- Price alerts: above/below a price, % move from the previous close, new 52-week high/low (from Angel One's full quote). At most once per India day per alert (the cooldown); held-back alerts in quiet hours still count
+- **Checks without a per-minute cron** (Vercel Hobby runs each job once a day): with the live price refresh (at most once a minute while a page is open in market hours), the daily `alerts` job at 3:30–4:30 PM, and optionally an external scheduler (cron-job.org) calling `/api/cron/alerts` with the cron secret every 5 minutes. The route skips weekends, holidays and closed hours on its own
+- Daily summary once per trading day after the close; the daily snapshot sends it if the alerts job didn't
+- System alerts: a scheduled job failing, the Angel One login failing; each message once a day
+- Prices for stocks with active alerts are fetched even if no one holds or watches them
+- Alerts page: Telegram connect/test/disconnect, price alerts (add, pause, delete; up to 100), what to send and quiet hours, recent alerts; the Settings placeholder is gone
+- Later: portfolio-move, news and reminder alerts, weekly summary and bot commands (see Stage 12 notes)
 - **Done when:** Dad receives a test alert and the daily summary
 
 ### Stage 10: Crypto, watchlist, news ✅
@@ -571,7 +577,7 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - **Done when:** a monthly CAS upload confirms every member's holdings
 
 ### Stage 12: Extras & hardening ✅
-Built before Stage 11 on request, in three parts. The remaining alerts (portfolio moves, news, reminders, weekly summary) and Telegram bot commands need Telegram, so they moved to Stage 9.
+Built before Stage 11 on request, in three parts. The remaining alerts (portfolio moves, news, reminders, weekly summary) and Telegram bot commands need Telegram; they come after the Stage 9 launch set.
 
 Fixes first: on phones, hidden screen-reader labels inside table cells escaped their scroll boxes (the boxes weren't positioned), widening member pages to ~700px so the browser zoomed out and forms looked broken; every table scroll box is now `relative`, and the picker search box uses 16px text so iPhones don't zoom. News storage trimmed to 10 headlines per stock for 14 days, and headlines of stocks no longer held or watched are deleted.
 
@@ -606,5 +612,5 @@ All questions are answered. Get these ready (none go into git):
 | 4 | Vercel account linked to GitHub | Stage 7 | vercel.com |
 | 5 | Each member's holdings export (Angel One, Zerodha Console, Groww, Upstox, 5paisa) | Stage 4 (opening balances) | Broker apps → Reports |
 | 6 | CAMS/KFintech detailed CAS PDF per PAN | Stage 8 | camsonline.com / mfcentral.com |
-| 7 | Telegram bot token (from @BotFather) + Dad's chat ID | Stage 9 | Telegram |
+| 7 | Telegram bot token (from @BotFather); the chat is linked in the app | Stage 9 | Telegram |
 | 8 | CoinDCX read-only API key (optional) | Stage 11 | CoinDCX → API dashboard |

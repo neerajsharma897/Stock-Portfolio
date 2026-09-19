@@ -1,6 +1,7 @@
 import "server-only"
 
-import type { JobName } from "@/lib/jobs/names"
+import { notifySystem } from "@/lib/alerts/deliver"
+import { JOBS, type JobName } from "@/lib/jobs/names"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 export type JobOutcome = {
@@ -44,6 +45,12 @@ export async function runJob(
     .eq("id", run.id)
   if (updateError) {
     console.error(`Couldn't finish job run ${run.id}: ${updateError.message}`)
+  }
+  if (outcome.status === "failed") {
+    await notifySystem(
+      supabase,
+      `❗ ${JOBS[job].label} failed: ${outcome.error ?? outcome.summary}`,
+    )
   }
   return outcome
 }

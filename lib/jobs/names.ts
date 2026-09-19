@@ -22,6 +22,11 @@ export const JOBS = {
     label: "Crypto coin list",
     schedule: "Mondays, between 8:30 and 9:30 AM India time",
   },
+  alerts: {
+    label: "Alerts check",
+    schedule:
+      "Weekdays, between 3:30 and 4:30 PM India time (daily summary); more often with an external scheduler, see Alerts",
+  },
 } as const
 
 export type JobName = keyof typeof JOBS

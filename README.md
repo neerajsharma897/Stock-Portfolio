@@ -131,6 +131,35 @@ first investment date for opening balances to get a meaningful figure.
 XIRR now shows per stock and coin, and on the summary tiles for each member and the family once money has been invested
 for a year and every holding has a price.
 
+## Telegram alerts (Stage 9)
+
+1. Run `supabase/migrations/20260920090000_telegram_alerts.sql` in the Supabase SQL Editor.
+2. Create a bot: in Telegram, message **@BotFather** → `/newbot` → pick a name and a username ending in `bot`. It
+   replies with a token. Put it in `.env.local` (and in Vercel, see below) as `TELEGRAM_BOT_TOKEN`, then restart
+   `npm run dev`. Anyone with the token can send messages as the bot; if it leaks, send `/revoke` to @BotFather and
+   use the new one.
+3. Open **Alerts** → **Connect Telegram**. Open the link it shows on the phone that should get the alerts, press
+   **Start** in Telegram, then **I pressed Start** in the app. A welcome message arrives; **Send test alert** checks it any time.
+4. **Price alerts**: above or below a price, a move of some % from the previous close, or a new 52-week high or low.
+   Each alert fires at most once a day and can be paused. Up to 100.
+5. **What to send**: the daily summary after the close (family and member values, today's change, top movers),
+   problem alerts (a scheduled job failed or the Angel One login stopped working) and quiet hours (India time; held-back
+   alerts are listed under Recent alerts, which keeps 90 days).
+
+**How often prices are checked.** Vercel's free plan runs a scheduled job only once a day, so:
+
+- While the dashboard, a member page or the watchlist is open in market hours, alerts are checked with the live prices,
+  at most once a minute.
+- The **Alerts** job (Mon–Fri, 3:30–4:30 PM India) checks alerts on closing prices and sends the daily summary. The
+  daily snapshot job sends the summary too if the alerts job didn't.
+- **For alerts with the app closed (optional, free):** sign up at cron-job.org → **Create cronjob**:
+  - URL: `https://<your site>/api/cron/alerts`
+  - Schedule: every 5 minutes; under Advanced, pick the **Asia/Kolkata** time zone, days Mon–Fri, hours 9–15
+  - Advanced → Headers: `Authorization` = `Bearer <CRON_SECRET>` (the same value as in Vercel)
+
+  The job skips weekends, listed holidays and times outside market hours by itself, so an extra call costs nothing.
+  Each run shows under Settings → Scheduled jobs; it needs Angel One set up for fresh prices.
+
 ## Deploying to Vercel (Stage 7)
 
 1. **Run the migrations** `supabase/migrations/20260914170000_scheduled_jobs.sql` and then
@@ -147,6 +176,7 @@ for a year and every holding has a price.
    | `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → Secret keys |
    | `CRON_SECRET` | A random string: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
    | `ANGELONE_API_KEY`, `ANGELONE_CLIENT_CODE`, `ANGELONE_PIN`, `ANGELONE_TOTP_SECRET` | Optional, see step 5 above |
+   | `TELEGRAM_BOT_TOKEN` | Optional, see Telegram alerts above |
 
 5. **Point Supabase at the live site:** Supabase → Authentication → URL Configuration → **Site URL** = your Vercel address,
    e.g. `https://family-portfolio.vercel.app`.
@@ -164,6 +194,7 @@ Defined in `vercel.json`. Times are UTC; on Vercel's free plan each job runs onc
 | Mutual fund NAVs | Mon–Fri, 18:00 UTC (11:30 PM–12:30 AM India) | Downloads AMFI's NAV file: new funds, latest NAVs, and closed funds marked inactive. |
 | Stock list update | Mondays, 02:00 UTC (7:30–8:30 AM India) | Refreshes the stock list from Angel One's instrument file. |
 | Stock news | Every day, 01:00 UTC (6:30–7:30 AM India) | Searches Google News for held and watchlisted stocks and deletes headlines older than 14 days or for stocks no longer followed. |
+| Alerts | Mon–Fri, 10:00 UTC (3:30–4:30 PM India) | Checks price alerts on the latest prices and sends the Telegram daily summary after the close. See Telegram alerts for checks during the day. |
 | Crypto coin list | Mondays, 03:00 UTC (8:30–9:30 AM India) | Refreshes CoinDCX's rupee coins with prices; coins no longer traded for rupees are marked inactive. |
 
 Vercel may occasionally skip or repeat a run; every job is safe to run again.

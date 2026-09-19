@@ -11,7 +11,6 @@ import { MfaCard } from "@/app/(app)/settings/mfa-card"
 import { UpdateCoinListButton } from "@/app/(app)/settings/update-coin-list-button"
 import { UpdateFundListButton } from "@/app/(app)/settings/update-fund-list-button"
 import { UpdateStockListButton } from "@/app/(app)/settings/update-stock-list-button"
-import { ComingSoon } from "@/components/coming-soon"
 import { PageHeader } from "@/components/layout/page-header"
 import {
   Card,
@@ -619,17 +618,6 @@ export default async function SettingsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      <div className="mt-2">
-        <ComingSoon
-          stage={9}
-          title="Telegram settings"
-          items={[
-            "Connect the Telegram bot",
-            "Quiet hours and which alerts are on",
-          ]}
-        />
       </div>
     </>
   )

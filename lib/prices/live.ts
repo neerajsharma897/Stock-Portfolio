@@ -2,6 +2,8 @@ import "server-only"
 
 import { unstable_rethrow } from "next/navigation"
 
+import { notifySystem } from "@/lib/alerts/deliver"
+import { checkPriceAlerts } from "@/lib/alerts/run"
 import { AngelOneError } from "@/lib/angelone/client"
 import { getAngelOneConfig, type AngelOneConfig } from "@/lib/angelone/config"
 import { requireOwner } from "@/lib/auth"
@@ -17,9 +19,12 @@ const CLOSED_INTERVAL_MS = 30 * 60_000
 const REQUEST_ERROR_BACKOFF_MS = 30_000
 // A failed login usually means wrong settings; retrying quickly could lock the account.
 const LOGIN_ERROR_BACKOFF_MS = 10 * 60_000
+// Price alerts are checked at most this often while pages refresh prices.
+const ALERT_CHECK_INTERVAL_MS = 60_000
 
 type RefreshStore = {
   nextAttemptAt: number
+  alertsCheckedAt?: number
   lastFetchedAt: string | null
   lastError: string | null
   inFlight?: Promise<LiveStatus>
@@ -108,6 +113,20 @@ export async function refreshLivePrices(): Promise<LiveStatus> {
   return store.inFlight
 }
 
+/** Checks price alerts after fresh prices, at most once a minute. Never throws. */
+async function checkAlertsNow() {
+  const store = refreshStore()
+  if (Date.now() - (store.alertsCheckedAt ?? 0) < ALERT_CHECK_INTERVAL_MS) return
+  store.alertsCheckedAt = Date.now()
+  try {
+    await checkPriceAlerts(await createClient())
+  } catch (error) {
+    console.error(
+      `Couldn't check price alerts: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
+
 async function runRefresh(
   config: AngelOneConfig,
   market: MarketStatus,
@@ -123,6 +142,7 @@ async function runRefresh(
     if (pricedAt) store.lastFetchedAt = pricedAt
     store.lastError = null
     store.nextAttemptAt = Date.now() + interval
+    await checkAlertsNow()
     return {
       configured: true,
       market,
@@ -134,6 +154,12 @@ async function runRefresh(
     const loginFailed = error instanceof AngelOneError && error.kind === "login"
     store.lastError =
       error instanceof Error ? error.message : "Couldn't fetch live prices."
+    if (loginFailed) {
+      await notifySystem(
+        await createClient(),
+        "❗ Live prices are down: Angel One login failed. Check Settings → Live prices.",
+      )
+    }
     store.nextAttemptAt =
       Date.now() +
       (loginFailed
