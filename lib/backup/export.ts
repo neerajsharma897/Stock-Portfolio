@@ -35,6 +35,10 @@ export async function buildBackup(
     watchlists,
     watchlist,
     newsSearches,
+    corporateActions,
+    fixedDeposits,
+    otherAssets,
+    ipoApplications,
     instrumentPrices,
     marketHolidays,
     eodPrices,
@@ -110,6 +114,42 @@ export async function buildBackup(
         .order("instrument_id")
         .range(from, to),
     ),
+    readAllRows("splits and bonuses", (from, to) =>
+      supabase
+        .from("corporate_actions")
+        .select(
+          "id, kind, ex_date, ratio_from, ratio_to, notes, created_at, updated_at, instrument:instruments(exchange, token, symbol)",
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    readAllRows("fixed deposits", (from, to) =>
+      supabase
+        .from("fixed_deposits")
+        .select(
+          "id, member_id, bank, principal, rate_pct, interest, start_date, maturity_date, closed_on, notes, created_at, updated_at",
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    readAllRows("other assets", (from, to) =>
+      supabase
+        .from("other_assets")
+        .select(
+          "id, member_id, kind, name, invested, current_value, value_as_of, notes, created_at, updated_at",
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    readAllRows("IPO applications", (from, to) =>
+      supabase
+        .from("ipo_applications")
+        .select(
+          "id, member_id, company, applied_on, shares_applied, price, status, shares_allotted, notes, created_at, updated_at",
+        )
+        .order("id")
+        .range(from, to),
+    ),
     readAllRows("prices", (from, to) =>
       supabase
         .from("instrument_prices")
@@ -162,6 +202,10 @@ export async function buildBackup(
     newsSearches: newsSearches.flatMap(({ search_name, ...row }) =>
       search_name ? [{ ...withStockRef(row), search_name }] : [],
     ),
+    corporateActions: corporateActions.map(withStockRef),
+    fixedDeposits,
+    otherAssets,
+    ipoApplications,
     instrumentPrices: instrumentPrices.map(withStockRef),
     marketHolidays,
     eodPrices: eodPrices.map(withStockRef),

@@ -6,6 +6,12 @@ import {
   type Position,
   type PositionTransaction,
 } from "@/lib/portfolio/holdings"
+import {
+  annualReturn,
+  cashFlowsOf,
+  valuationDate,
+} from "@/lib/portfolio/returns"
+import type { CashFlow } from "@/lib/portfolio/xirr"
 
 export type CryptoTransactionForHolding = PositionTransaction & {
   brokerAccountId: string
@@ -16,6 +22,8 @@ export type CryptoHolding = {
   brokerAccountId: string
   market: string
   position: Position
+  /** Money put in (negative) and taken out (positive), one per entry. */
+  flows: CashFlow[]
 }
 
 /** A coin whose saved entries don't add up, e.g. a sell larger than the coins held. */
@@ -47,6 +55,8 @@ export type ValuedCrypto = CryptoHolding & {
   /** Change over the last 24 hours; null without a 24-hour change. */
   dayChange: number | null
   dayChangePct: number | null
+  /** Yearly return as a fraction; null under a year or without a price. */
+  xirr: number | null
 }
 
 /** Groups a member's coin entries into one holding per account and coin. */
@@ -67,7 +77,12 @@ export function groupCryptoHoldings(
     const { brokerAccountId, market } = group[0]
     const result = buildPosition(group)
     if (result.ok) {
-      holdings.push({ brokerAccountId, market, position: result.position })
+      holdings.push({
+        brokerAccountId,
+        market,
+        position: result.position,
+        flows: cashFlowsOf(group),
+      })
     } else {
       problems.push({
         brokerAccountId,
@@ -107,6 +122,7 @@ export function valueCrypto(
       unrealizedPct: null,
       dayChange: null,
       dayChangePct: null,
+      xirr: quantity <= 0 ? annualReturn(holding.flows) : null,
     }
   }
 
@@ -123,6 +139,10 @@ export function valueCrypto(
         ? null
         : quantity * (coinPrice.lastPrice - previousClose),
     dayChangePct: previousClose === null ? null : change,
+    xirr: annualReturn(holding.flows, {
+      date: valuationDate(coinPrice.pricedAt),
+      amount: currentValue,
+    }),
   }
 }
 

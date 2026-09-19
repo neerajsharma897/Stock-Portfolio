@@ -17,7 +17,7 @@ const TIME = "2026-09-14T10:00:00+00:00"
 
 const backup: Backup = {
   app: "family-portfolio",
-  version: 4,
+  version: 5,
   exportedAt: TIME,
   members: [
     {
@@ -123,6 +123,39 @@ const backup: Backup = {
       search_name: "Reliance Industries",
     },
   ],
+  corporateActions: [
+    {
+      id: "9f7c8a0e-1bcd-4e35-8f01-6c7d8e9fa0b1",
+      exchange: "NSE",
+      token: "11536",
+      symbol: "TCS",
+      kind: "bonus",
+      ex_date: "2026-08-01",
+      ratio_from: 1,
+      ratio_to: 1,
+      notes: null,
+      created_at: TIME,
+      updated_at: TIME,
+    },
+  ],
+  fixedDeposits: [
+    {
+      id: "a08d9b1f-2cde-4f46-9012-7d8e9fa0b1c2",
+      member_id: MEMBER_ID,
+      bank: "SBI",
+      principal: 100000,
+      rate_pct: 7.1,
+      interest: "quarterly",
+      start_date: "2026-01-01",
+      maturity_date: "2027-01-01",
+      closed_on: null,
+      notes: null,
+      created_at: TIME,
+      updated_at: TIME,
+    },
+  ],
+  otherAssets: [],
+  ipoApplications: [],
   instrumentPrices: [
     {
       exchange: "NSE",
@@ -178,6 +211,10 @@ describe("parseBackupText", () => {
     delete versionOne.watchlists
     delete versionOne.watchlist
     delete versionOne.newsSearches
+    delete versionOne.corporateActions
+    delete versionOne.fixedDeposits
+    delete versionOne.otherAssets
+    delete versionOne.ipoApplications
     const result = parseBackupText(JSON.stringify(versionOne), null)
     expect(result.backup.version).toBe(1)
     expect(result.backup.mfTransactions).toEqual([])
@@ -185,6 +222,7 @@ describe("parseBackupText", () => {
     expect(result.backup.watchlists).toEqual([])
     expect(result.backup.watchlist).toEqual([])
     expect(result.backup.newsSearches).toEqual([])
+    expect(result.backup.fixedDeposits).toEqual([])
   })
 
   it("reads a version 3 backup, whose watchlist stocks have no list", () => {
@@ -222,6 +260,10 @@ describe("countBackup and references", () => {
       cryptoEntries: 1,
       watchlists: 1,
       watchlist: 1,
+      deposits: 1,
+      otherAssets: 0,
+      ipos: 0,
+      corporateActions: 1,
       prices: 1,
       holidays: 1,
       closingPrices: 1,

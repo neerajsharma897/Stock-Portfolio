@@ -3,8 +3,11 @@ import { unstable_rethrow } from "next/navigation"
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react"
 
 import { BackupCard } from "@/app/(app)/settings/backup-card"
+import { CorporateActionDialog } from "@/app/(app)/settings/corporate-action-dialog"
+import { CorporateActionsList } from "@/app/(app)/settings/corporate-actions-list"
 import { DeleteHolidayButton } from "@/app/(app)/settings/delete-holiday-button"
 import { HolidayForm } from "@/app/(app)/settings/holiday-form"
+import { MfaCard } from "@/app/(app)/settings/mfa-card"
 import { UpdateCoinListButton } from "@/app/(app)/settings/update-coin-list-button"
 import { UpdateFundListButton } from "@/app/(app)/settings/update-fund-list-button"
 import { UpdateStockListButton } from "@/app/(app)/settings/update-stock-list-button"
@@ -17,7 +20,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { requireUser } from "@/lib/auth"
+import { hasTwoStepSignIn, requireUser } from "@/lib/auth"
+import { listRecentChanges, type RecentChange } from "@/lib/data/audit"
+import {
+  listCorporateActions,
+  type CorporateActionRow,
+} from "@/lib/data/corporate-actions"
 import { getCoinListStatus, type CoinListStatus } from "@/lib/data/crypto"
 import { listMarketHolidays, type MarketHoliday } from "@/lib/data/holidays"
 import {
@@ -241,6 +249,9 @@ export default async function SettingsPage() {
     liveStatus,
     holidays,
     jobRuns,
+    corporateActions,
+    twoStep,
+    recentChanges,
   ] = await Promise.all([
     supabase
       .from("app_owner")
@@ -254,6 +265,9 @@ export default async function SettingsPage() {
       listMarketHolidays({ from: todayInIndia() }),
     ),
     attempt(listLatestJobRuns),
+    attempt<CorporateActionRow[]>(listCorporateActions),
+    attempt<boolean>(hasTwoStepSignIn),
+    attempt<RecentChange[]>(() => listRecentChanges(30)),
   ])
 
   return (
@@ -279,6 +293,27 @@ export default async function SettingsPage() {
               <dt className="text-muted-foreground">Owner since</dt>
               <dd>{owner ? formatDate(owner.created_at) : "—"}</dd>
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Two-step sign-in</CardTitle>
+            <CardDescription>
+              A code from an authenticator app after the password, so a leaked
+              password isn&apos;t enough.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {"error" in twoStep ? (
+              <StatusRow
+                ok={false}
+                label="Two-step sign-in unavailable"
+                detail={twoStep.error}
+              />
+            ) : (
+              <MfaCard enabled={twoStep.value} />
+            )}
           </CardContent>
         </Card>
 
@@ -497,6 +532,67 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <BackupCard />
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Splits &amp; bonuses</CardTitle>
+            <CardDescription>
+              Stock splits and bonus issues. Every family holding of the stock
+              gets the new share count and average price from the ex-date.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {"error" in corporateActions ? (
+              <StatusRow
+                ok={false}
+                label="Splits and bonuses unavailable"
+                detail={`Run the Stage 12 migration (see README). ${corporateActions.error}`}
+              />
+            ) : (
+              <>
+                <CorporateActionsList actions={corporateActions.value} />
+                <CorporateActionDialog />
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Recent changes</CardTitle>
+            <CardDescription>
+              The last 30 additions, edits and deletions of family data. Kept
+              for a year.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {"error" in recentChanges ? (
+              <StatusRow
+                ok={false}
+                label="Recent changes unavailable"
+                detail={`Run the Stage 12 migrations (see README). ${recentChanges.error}`}
+              />
+            ) : recentChanges.value.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No changes recorded yet.
+              </p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {recentChanges.value.map((change) => (
+                  <li
+                    key={change.id}
+                    className="flex flex-wrap justify-between gap-x-4 gap-y-0.5 py-2 first:pt-0 last:pb-0"
+                  >
+                    <span className="min-w-0">{change.description}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {dateTimeFormatter.format(new Date(change.changedAt))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
 

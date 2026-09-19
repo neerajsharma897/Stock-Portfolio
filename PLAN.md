@@ -443,7 +443,7 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 | 10 | Crypto, watchlist, news | — (public CoinDCX ticker, RSS) | ✅ Built |
 | 10b | Watchlists & charts | Angel One (for chart history) | ✅ Built |
 | 11 | Imports & reconciliation | CoinDCX read-only key (optional) | Next |
-| 12 | Extras & hardening | — | |
+| 12 | Extras & hardening (alerts part waits for Stage 9) | — | ✅ Built |
 
 ### Stage 1: Foundation ✅
 - Next.js 16 + TypeScript + Tailwind 4 + shadcn/ui, ESLint, Prettier, Vitest
@@ -549,7 +549,7 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - Crypto counts in family and member totals and snapshots; its 24-hour change isn't counted as "today"
 - Crypto page: value, 24-hour change, P&L and a tax estimate for the financial year (30% + 4% cess on each sell's gain, losses not set off, 1% TDS). `lib/portfolio/holdings` now records each sell's FIFO cost for this (and Stage 12's capital gains)
 - Watchlist page: stocks with a note, live Angel One prices (the refresh now includes watchlist stocks), hand-entered prices and a link to news
-- News page from Google News RSS for stocks held by active members plus the watchlist. Checked against real feeds: a bare ticker also finds namesakes and "share price today" pages, so headlines must name the stock, quote pages are dropped, and each stock's search name can be changed (e.g. "Reliance Industries"). Opening the page searches stocks not checked for 30 minutes; `/api/cron/news` runs every morning. Headlines older than 30 days are deleted. Keyword labels (Results, Dividend, Deal, Regulatory, Order, Rating) mark likely market-moving headlines
+- News page from Google News RSS for stocks held by active members plus the watchlist. Checked against real feeds: a bare ticker also finds namesakes and "share price today" pages, so headlines must name the stock, quote pages are dropped, and each stock's search name can be changed (e.g. "Reliance Industries"). Opening the page searches stocks not checked for 30 minutes; `/api/cron/news` runs every morning. Only headline, link, source and date are stored (10 per stock), deleted after 14 days or when the stock is no longer held or watched, so news stays well under 1 MB of the free tier. Keyword labels (Results, Dividend, Deal, Regulatory, Order, Rating) mark likely market-moving headlines
 - Stock symbols on member pages link to their news
 - Backup format version 3 adds crypto entries (by CoinDCX market), the watchlist and news search names; versions 1 and 2 still restore
 - Moved: CoinDCX trade-history CSV import to Stage 11; news alerts to Stage 12
@@ -570,12 +570,27 @@ We build **one stage at a time**. Each stage ends in a working app you can run, 
 - Angel One holdings auto-sync; CoinDCX balance sync (read-only key)
 - **Done when:** a monthly CAS upload confirms every member's holdings
 
-### Stage 12: Extras & hardening
-- Stock splits and bonuses (corporate actions) applied to holdings
-- FDs, IPO applications, other assets (gold, PPF, bonds)
-- Capital gains report per member per FY, XIRR everywhere, Excel export
-- Remaining alerts (portfolio moves, news, reminders, weekly summary), Telegram bot commands
-- MFA for the owner, PWA install, audit log
+### Stage 12: Extras & hardening ✅
+Built before Stage 11 on request, in three parts. The remaining alerts (portfolio moves, news, reminders, weekly summary) and Telegram bot commands need Telegram, so they moved to Stage 9.
+
+Fixes first: on phones, hidden screen-reader labels inside table cells escaped their scroll boxes (the boxes weren't positioned), widening member pages to ~700px so the browser zoomed out and forms looked broken; every table scroll box is now `relative`, and the picker search box uses 16px text so iPhones don't zoom. News storage trimmed to 10 headlines per stock for 14 days, and headlines of stocks no longer held or watched are deleted.
+
+**12a: Splits, bonuses and other assets**
+- Migration `20260919120000_corporate_actions_other_assets.sql`: `corporate_actions` (split or bonus, ratio, ex-date), `fixed_deposits`, `other_assets` (gold, silver, PPF, EPF, NPS, bonds, property, other) and `ipo_applications`; owner RLS, secret-key read access, backup version 5 in restore
+- Splits scale every lot's quantity and cost per share on the ex-date (what was paid stays the same); bonuses add a zero-cost lot dated the ex-date, whole shares only (part shares are paid in cash). Trades on the ex-date are at the new price. Entered in Settings → Splits & bonuses, which refuses a change that would make a later sell larger than the shares held
+- FDs valued with compound interest to today (monthly, quarterly, half-yearly or yearly; payout FDs stay at the principal), capped at maturity; closed FDs leave the totals. Other assets at the value last entered. IPO applications are tracked but not counted
+- Member page cards for FDs, other assets and IPOs; family page **FDs & other assets** with FDs maturing within 30 days; dashboard **By asset type** card. FDs and other assets count in member and family totals and daily snapshots
+
+**12b: Tax report, XIRR everywhere, Excel**
+- The FIFO engine records which lots each sell used (date, quantity, cost, and whether from an opening balance)
+- **Tax reports** page per member and financial year: each sell split into short- and long-term parts; shares and equity funds estimated at 20% / 12.5% above ₹1.25 lakh (15% / 10% above ₹1 lakh before 23 July 2024) plus cess, a short-term loss set off against long-term gains; gold bonds and debt/other funds shown without an estimate; crypto at 30% plus cess with 1% TDS. Funds are classed as equity from AMFI's category (and Nifty/Sensex index funds). Opening-balance lots are marked as approximate. Not covered: grandfathering (pre-2018), surcharge, carried-forward losses, dividends
+- XIRR per stock and coin holding (like funds) and one XIRR per member and for the family across stocks, funds, crypto and FDs, shown on the summary tiles once a year has passed and everything has a price
+- **Download Excel** (`/api/export/excel`, `write-excel-file`): holdings, the year's capital gains, stock/fund/crypto entries, FDs and IPOs, one sheet each
+
+**12c: Two-step sign-in, install, audit log**
+- Migration `20260919150000_mfa_audit_log.sql`: `owner_access()` returns owner / needs_mfa / not_owner; `is_owner()` (every RLS policy) now requires Supabase's aal2 once an authenticator app is set up, so a stolen password alone can't read data. Settings → Two-step sign-in adds or removes the app (TOTP); sign-in then asks for the code at `/verify`
+- Install on the phone: `app/manifest.ts`, generated icons (`/icons/*.png`, `apple-icon`), readable without a session. No service worker: the app needs the network for prices anyway
+- `audit_log` filled by triggers on the family-data tables (not prices or news); a restore is one entry. The daily snapshot deletes entries older than a year. Settings shows the last 30 changes. Restore rows now live in `restore_family_rows`; `restore_family_data` wraps it
 
 ---
 

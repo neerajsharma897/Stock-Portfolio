@@ -118,7 +118,7 @@ export function FundsCard({
               : `Add an opening balance for each fund ${memberName} already holds, using the units and invested amount from the platform or statement.`}
           </p>
         ) : (
-          <div className="-mx-4 overflow-x-auto">
+          <div className="relative -mx-4 overflow-x-auto">
             <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">

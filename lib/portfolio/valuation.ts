@@ -4,6 +4,7 @@
 
 import type { Position } from "@/lib/portfolio/holdings"
 import type { Holding } from "@/lib/portfolio/member-holdings"
+import { annualReturn, valuationDate } from "@/lib/portfolio/returns"
 
 export type Price = {
   lastPrice: number
@@ -22,6 +23,8 @@ export type ValuedHolding = Holding & {
   /** Null without a previous close. */
   dayChange: number | null
   dayChangePct: number | null
+  /** Yearly return as a fraction (0.12 = 12%); null under a year or without a price. */
+  xirr: number | null
 }
 
 export type PortfolioSummary = {
@@ -78,6 +81,8 @@ export function valueHolding(
       unrealizedPct: null,
       dayChange: null,
       dayChangePct: null,
+      // A sold-out holding's return comes from its entries alone.
+      xirr: quantity <= 0 ? annualReturn(holding.flows) : null,
     }
   }
 
@@ -99,6 +104,10 @@ export function valueHolding(
       previousClose === null
         ? null
         : percentOf(price.lastPrice - previousClose, previousClose),
+    xirr: annualReturn(holding.flows, {
+      date: valuationDate(price.pricedAt),
+      amount: currentValue,
+    }),
   }
 }
 

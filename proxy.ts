@@ -28,9 +28,15 @@ function redirectWithCookies(url: URL, from: NextResponse) {
 export async function proxy(request: NextRequest) {
   // Scheduled jobs and the GitHub backup have no session: their routes check
   // CRON_SECRET instead. (Cron requests don't follow redirects, so a login
-  // redirect would skip the job.)
+  // redirect would skip the job.) Phones fetch the app manifest and home-screen
+  // icon without cookies; the .png icons are already outside the matcher.
   const { pathname: requestPath } = request.nextUrl
-  if (requestPath.startsWith("/api/cron/") || requestPath === "/api/backup") {
+  if (
+    requestPath.startsWith("/api/cron/") ||
+    requestPath === "/api/backup" ||
+    requestPath === "/manifest.webmanifest" ||
+    requestPath === "/apple-icon"
+  ) {
     return NextResponse.next()
   }
 

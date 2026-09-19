@@ -39,7 +39,7 @@ export function FundTransactionsCard({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="-mx-4 overflow-x-auto">
+        <div className="relative -mx-4 overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">

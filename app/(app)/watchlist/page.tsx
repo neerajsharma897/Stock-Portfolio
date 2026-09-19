@@ -163,7 +163,7 @@ export default async function WatchlistPage({
                     prices like the family&apos;s holdings.
                   </p>
                 ) : (
-                  <div className="-mx-4 overflow-x-auto">
+                  <div className="relative -mx-4 overflow-x-auto">
                     <table className="w-full min-w-[600px] text-sm">
                       <thead>
                         <tr className="border-b text-left text-xs text-muted-foreground">

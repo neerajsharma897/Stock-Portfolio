@@ -12,6 +12,7 @@ function sale(date: string, value: number, costBasis: number): Sale {
     charges: 10,
     costBasis,
     realizedPnl: value - 10 - costBasis,
+    matched: [],
   }
 }
 

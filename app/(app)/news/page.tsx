@@ -183,7 +183,7 @@ export default async function NewsPage({ searchParams }: PageProps<"/news">) {
             {selected ? `${selected.symbol} headlines` : "Latest headlines"}
           </CardTitle>
           <CardDescription>
-            From the last 30 days, newest first. Labels like
+            From the last two weeks, newest first. Labels like
             &ldquo;Results&rdquo; come from keywords in the headline.
           </CardDescription>
         </CardHeader>

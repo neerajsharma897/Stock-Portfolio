@@ -1,6 +1,7 @@
 import "server-only"
 
 import { requireOwner } from "@/lib/auth"
+import { fetchCorporateActions } from "@/lib/data/corporate-actions"
 import { toHoldingTransaction } from "@/lib/data/transactions"
 import { groupHoldings } from "@/lib/portfolio/member-holdings"
 import { readAllRows } from "@/lib/supabase/read-all"
@@ -78,8 +79,12 @@ export async function loadNewsStocks(
       ...watchlistRows.map((row) => row.instrument),
     ].map((instrument) => [instrument.id, instrument]),
   )
+  const corporateActions = await fetchCorporateActions(
+    supabase,
+    transactions.map((transaction) => transaction.instrument_id),
+  )
   const held = new Set(
-    groupHoldings(transactions.map(toHoldingTransaction))
+    groupHoldings(transactions.map(toHoldingTransaction), corporateActions)
       .holdings.filter((holding) => holding.position.quantity > 0)
       .map((holding) => holding.instrumentId),
   )

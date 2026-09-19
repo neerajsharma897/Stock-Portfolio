@@ -9,6 +9,7 @@ import {
   validationError,
 } from "@/lib/action-state"
 import { requireOwner } from "@/lib/auth"
+import { fetchCorporateActions } from "@/lib/data/corporate-actions"
 import {
   type InstrumentOption,
   searchInstruments,
@@ -34,21 +35,27 @@ function fieldError(field: string, message: string): FormState {
   return { status: "error", fieldErrors: { [field]: [message] } }
 }
 
-/** Every transaction of one position: a broker account's holding of one stock. */
+/** Every transaction of one position (a broker account's holding of one stock), plus the stock's splits and bonuses. */
 async function loadPosition(
   supabase: Supabase,
   brokerAccountId: string,
   instrumentId: number,
 ) {
-  const { data, error } = await supabase
-    .from("transactions")
-    .select(POSITION_COLUMNS)
-    .eq("broker_account_id", brokerAccountId)
-    .eq("instrument_id", instrumentId)
+  const [{ data, error }, actions] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select(POSITION_COLUMNS)
+      .eq("broker_account_id", brokerAccountId)
+      .eq("instrument_id", instrumentId),
+    fetchCorporateActions(supabase, [instrumentId]),
+  ])
   if (error) {
     throw new Error(`Couldn't check existing transactions: ${error.message}`)
   }
-  return data.map(toHoldingTransaction)
+  return {
+    transactions: data.map(toHoldingTransaction),
+    actions: actions.get(instrumentId) ?? [],
+  }
 }
 
 export async function searchInstrumentsAction(
@@ -135,10 +142,13 @@ export async function saveTransaction(
       input.brokerAccountId,
       input.instrumentId,
     )
-    const check = buildPosition([
-      ...position.filter((transaction) => transaction.id !== id),
-      candidate,
-    ])
+    const check = buildPosition(
+      [
+        ...position.transactions.filter((transaction) => transaction.id !== id),
+        candidate,
+      ],
+      { actions: position.actions },
+    )
     if (!check.ok) {
       return actionError(
         check.transactionId === candidate.id
@@ -158,7 +168,8 @@ export async function saveTransaction(
         original.instrumentId,
       )
       const previousCheck = buildPosition(
-        previous.filter((transaction) => transaction.id !== id),
+        previous.transactions.filter((transaction) => transaction.id !== id),
+        { actions: previous.actions },
       )
       if (!previousCheck.ok) {
         return actionError(
@@ -242,7 +253,8 @@ export async function deleteTransaction(
       row.instrument_id,
     )
     const check = buildPosition(
-      remaining.filter((transaction) => transaction.id !== id),
+      remaining.transactions.filter((transaction) => transaction.id !== id),
+      { actions: remaining.actions },
     )
     if (!check.ok) {
       return actionError(

@@ -40,6 +40,36 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          id: number
+          new_data: Json | null
+          old_data: Json | null
+          row_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          row_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          row_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       broker_accounts: {
         Row: {
           broker: Database["public"]["Enums"]["broker"]
@@ -74,6 +104,200 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "broker_accounts_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      corporate_actions: {
+        Row: {
+          created_at: string
+          ex_date: string
+          id: string
+          instrument_id: number
+          kind: Database["public"]["Enums"]["corporate_action_kind"]
+          notes: string | null
+          ratio_from: number
+          ratio_to: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ex_date: string
+          id?: string
+          instrument_id: number
+          kind: Database["public"]["Enums"]["corporate_action_kind"]
+          notes?: string | null
+          ratio_from: number
+          ratio_to: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ex_date?: string
+          id?: string
+          instrument_id?: number
+          kind?: Database["public"]["Enums"]["corporate_action_kind"]
+          notes?: string | null
+          ratio_from?: number
+          ratio_to?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corporate_actions_instrument_id_fkey"
+            columns: ["instrument_id"]
+            isOneToOne: false
+            referencedRelation: "instruments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fixed_deposits: {
+        Row: {
+          bank: string
+          closed_on: string | null
+          created_at: string
+          id: string
+          interest: Database["public"]["Enums"]["fd_interest"]
+          maturity_date: string
+          member_id: string
+          notes: string | null
+          principal: number
+          rate_pct: number
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          bank: string
+          closed_on?: string | null
+          created_at?: string
+          id?: string
+          interest?: Database["public"]["Enums"]["fd_interest"]
+          maturity_date: string
+          member_id: string
+          notes?: string | null
+          principal: number
+          rate_pct: number
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          bank?: string
+          closed_on?: string | null
+          created_at?: string
+          id?: string
+          interest?: Database["public"]["Enums"]["fd_interest"]
+          maturity_date?: string
+          member_id?: string
+          notes?: string | null
+          principal?: number
+          rate_pct?: number
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fixed_deposits_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ipo_applications: {
+        Row: {
+          applied_on: string
+          company: string
+          created_at: string
+          id: string
+          member_id: string
+          notes: string | null
+          price: number
+          shares_allotted: number | null
+          shares_applied: number
+          status: Database["public"]["Enums"]["ipo_status"]
+          updated_at: string
+        }
+        Insert: {
+          applied_on: string
+          company: string
+          created_at?: string
+          id?: string
+          member_id: string
+          notes?: string | null
+          price: number
+          shares_allotted?: number | null
+          shares_applied: number
+          status?: Database["public"]["Enums"]["ipo_status"]
+          updated_at?: string
+        }
+        Update: {
+          applied_on?: string
+          company?: string
+          created_at?: string
+          id?: string
+          member_id?: string
+          notes?: string | null
+          price?: number
+          shares_allotted?: number | null
+          shares_applied?: number
+          status?: Database["public"]["Enums"]["ipo_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipo_applications_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      other_assets: {
+        Row: {
+          created_at: string
+          current_value: number
+          id: string
+          invested: number
+          kind: Database["public"]["Enums"]["other_asset_kind"]
+          member_id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          value_as_of: string
+        }
+        Insert: {
+          created_at?: string
+          current_value: number
+          id?: string
+          invested: number
+          kind: Database["public"]["Enums"]["other_asset_kind"]
+          member_id: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          value_as_of: string
+        }
+        Update: {
+          created_at?: string
+          current_value?: number
+          id?: string
+          invested?: number
+          kind?: Database["public"]["Enums"]["other_asset_kind"]
+          member_id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          value_as_of?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "other_assets_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
@@ -783,6 +1007,7 @@ export type Database = {
     Views: { [_ in never]: never }
     Functions: {
       is_owner: { Args: never; Returns: boolean }
+      owner_access: { Args: never; Returns: string }
       restore_family_data: { Args: { backup: Json }; Returns: Json }
     }
     Enums: {
@@ -794,7 +1019,19 @@ export type Database = {
         | "fivepaisa"
         | "coindcx"
         | "other"
+      corporate_action_kind: "split" | "bonus"
       exchange: "NSE" | "BSE"
+      fd_interest: "quarterly" | "monthly" | "half_yearly" | "yearly" | "payout"
+      ipo_status: "applied" | "allotted" | "not_allotted" | "withdrawn"
+      other_asset_kind:
+        | "gold"
+        | "silver"
+        | "ppf"
+        | "epf"
+        | "nps"
+        | "bond"
+        | "real_estate"
+        | "other"
       instrument_kind: "equity" | "sgb" | "index"
       job_status: "running" | "success" | "skipped" | "failed"
       member_relation:

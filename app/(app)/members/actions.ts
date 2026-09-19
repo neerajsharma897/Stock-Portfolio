@@ -123,7 +123,7 @@ export async function deleteMember(memberId: string): Promise<FormState> {
   if (error) {
     if (error.code === FOREIGN_KEY_VIOLATION) {
       return actionError(
-        "This member has stock transactions or mutual fund entries, so they can't be deleted. Delete those first, or keep the member archived.",
+        "This member still has entries (stocks, mutual funds, crypto, FDs, other assets or IPOs), so they can't be deleted. Delete those first, or keep the member archived.",
       )
     }
     return actionError(`Couldn't delete: ${error.message}`)
@@ -217,7 +217,7 @@ export async function deleteBrokerAccount(
   if (error) {
     if (error.code === FOREIGN_KEY_VIOLATION) {
       return actionError(
-        "This account has stock transactions or mutual fund entries, so it can't be deleted. Delete them or move them to another account first.",
+        "This account has stock, mutual fund or crypto entries, so it can't be deleted. Delete them or move them to another account first.",
       )
     }
     return actionError(`Couldn't delete: ${error.message}`)

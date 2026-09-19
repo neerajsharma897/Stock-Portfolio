@@ -2,6 +2,7 @@ import { LayoutDashboardIcon, TriangleAlertIcon } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
 
+import { AssetSplit } from "@/app/(app)/dashboard/asset-split"
 import { MemberSplit } from "@/app/(app)/dashboard/member-split"
 import { TopMovers } from "@/app/(app)/dashboard/top-movers"
 import { PageHeader } from "@/components/layout/page-header"
@@ -21,8 +22,16 @@ export default async function DashboardPage() {
     getFamilyPortfolio(),
     getLiveStatus(),
   ])
-  const { members, summary, cryptoSummary, instruments, priceItems, movers } =
-    portfolio
+  const {
+    members,
+    summary,
+    xirr,
+    assetClasses,
+    cryptoSummary,
+    instruments,
+    priceItems,
+    movers,
+  } = portfolio
 
   const hasActivity = summary.holdingCount > 0 || summary.realizedPnl !== 0
   if (members.length === 0 || !hasActivity) {
@@ -46,7 +55,7 @@ export default async function DashboardPage() {
             <p className="max-w-md text-sm text-muted-foreground">
               {members.length === 0
                 ? "Add each family member and their broker accounts first."
-                : "Open a member and add an opening balance for each stock, mutual fund or coin they hold. Family totals will appear here."}
+                : "Open a member and add what they hold: stocks, mutual funds, crypto, FDs or other assets. Family totals will appear here."}
             </p>
             <Button asChild>
               <Link href="/members">Go to members</Link>
@@ -106,13 +115,19 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <PortfolioSummaryTiles summary={summary} />
+      <PortfolioSummaryTiles summary={summary} xirr={xirr} />
 
       <div className="mt-2 grid gap-2 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <MemberSplit members={members} familyValue={summary.currentValue} />
         </div>
-        <TopMovers movers={movers} instruments={instruments} />
+        <div className="grid content-start gap-2">
+          <AssetSplit
+            assetClasses={assetClasses}
+            familyValue={summary.currentValue}
+          />
+          <TopMovers movers={movers} instruments={instruments} />
+        </div>
       </div>
     </>
   )

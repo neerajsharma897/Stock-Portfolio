@@ -11,6 +11,11 @@ import { FundTransactionsCard } from "@/app/(app)/members/[id]/fund-transactions
 import { FundsCard } from "@/app/(app)/members/[id]/funds-card"
 import { HoldingsCard } from "@/app/(app)/members/[id]/holdings-card"
 import { MemberStatusActions } from "@/app/(app)/members/[id]/member-status-actions"
+import {
+  DepositsCard,
+  IposCard,
+  OtherAssetsCard,
+} from "@/app/(app)/members/[id]/other-assets-cards"
 import { TransactionsCard } from "@/app/(app)/members/[id]/transactions-card"
 import { MemberFormDialog } from "@/app/(app)/members/member-form-dialog"
 import { LiveCryptoPrices } from "@/components/live-crypto-prices"
@@ -36,7 +41,10 @@ import {
   toCoinPrice,
   toCryptoHoldingTransaction,
 } from "@/lib/data/crypto"
+import { listCorporateActionsFor } from "@/lib/data/corporate-actions"
 import { getMember } from "@/lib/data/members"
+import { listMemberOtherAssets } from "@/lib/data/other-assets"
+import { todayInIndia } from "@/lib/dates"
 import {
   listMemberFundTransactions,
   toFundHoldingTransaction,
@@ -58,6 +66,11 @@ import {
   groupFundHoldings,
   valueFund,
 } from "@/lib/mutual-funds/portfolio"
+import {
+  depositForTotals,
+  otherAssetForTotals,
+} from "@/lib/other-assets/portfolio"
+import { overallReturn } from "@/lib/portfolio/overall-return"
 import { groupHoldings } from "@/lib/portfolio/member-holdings"
 import {
   buildPriceItems,
@@ -91,22 +104,33 @@ export default async function MemberPage({
     canHoldCrypto(account.broker),
   )
 
-  const [transactions, fundTransactions, cryptoTransactions, liveStatus] =
-    await Promise.all([
-      listMemberTransactions(member.id),
-      listMemberFundTransactions(member.id),
-      listMemberCryptoTransactions(member.id),
-      getLiveStatus(),
-    ])
+  const today = todayInIndia()
+  const [
+    transactions,
+    fundTransactions,
+    cryptoTransactions,
+    others,
+    liveStatus,
+  ] = await Promise.all([
+    listMemberTransactions(member.id),
+    listMemberFundTransactions(member.id),
+    listMemberCryptoTransactions(member.id),
+    listMemberOtherAssets(member.id, today),
+    getLiveStatus(),
+  ])
   const instruments = new Map(
     transactions.map((transaction) => [
       transaction.instrument_id,
       transaction.instrument,
     ]),
   )
-  const prices = await listPrices(instruments.keys())
+  const [prices, corporateActions] = await Promise.all([
+    listPrices(instruments.keys()),
+    listCorporateActionsFor(instruments.keys()),
+  ])
   const { holdings, problems } = groupHoldings(
     transactions.map(toHoldingTransaction),
+    corporateActions,
   )
   const valued = holdings.map((holding) =>
     valueHolding(holding, prices.get(holding.instrumentId) ?? null),
@@ -143,7 +167,13 @@ export default async function MemberPage({
     ...valued,
     ...forFamilyTotals(funds),
     ...cryptoForFamilyTotals(crypto),
+    ...others.deposits.map((deposit) => depositForTotals(deposit, today)),
+    ...others.otherAssets.map(otherAssetForTotals),
   ])
+  const xirr = overallReturn(
+    { holdings: valued, funds, crypto, deposits: others.deposits },
+    today,
+  )
 
   return (
     <div className="grid gap-2">
@@ -198,7 +228,9 @@ export default async function MemberPage({
         </p>
       )}
 
-      {summary.holdingCount > 0 && <PortfolioSummaryTiles summary={summary} />}
+      {summary.holdingCount > 0 && (
+        <PortfolioSummaryTiles summary={summary} xirr={xirr} />
+      )}
 
       <HoldingsCard
         memberId={member.id}
@@ -231,6 +263,20 @@ export default async function MemberPage({
         problems={cryptoProblems}
         coins={coins}
       />
+
+      <DepositsCard
+        memberId={member.id}
+        archived={archived}
+        deposits={others.deposits}
+      />
+
+      <OtherAssetsCard
+        memberId={member.id}
+        archived={archived}
+        assets={others.otherAssets}
+      />
+
+      <IposCard memberId={member.id} archived={archived} ipos={others.ipos} />
 
       <TransactionsCard
         memberId={member.id}

@@ -45,6 +45,81 @@ describe("buildPosition", () => {
     })
   })
 
+  it("splits every lot on the ex-date without changing what was paid", () => {
+    const result = buildPosition(
+      [
+        txn("buy", 10, 1000, "2024-01-01", { charges: 20 }),
+        // Bought on the ex-date, so already at the post-split price.
+        txn("buy", 5, 200, "2024-06-03"),
+        txn("sell", 40, 250, "2024-07-01"),
+      ],
+      {
+        actions: [
+          {
+            id: "split",
+            kind: "split",
+            exDate: "2024-06-03",
+            ratioFrom: 1,
+            ratioTo: 5,
+          },
+        ],
+      },
+    )
+    if (!result.ok) throw new Error(result.message)
+    // 50 split shares at 200.4 each, then 5 at 200; 40 sold first-in.
+    expect(result.position.quantity).toBe(15)
+    expect(result.position.invested).toBeCloseTo(10 * 200.4 + 5 * 200)
+    expect(result.position.sales[0].costBasis).toBeCloseTo(40 * 200.4)
+  })
+
+  it("adds bonus shares as a free lot dated the ex-date, whole shares only", () => {
+    const result = buildPosition(
+      [txn("opening_balance", 5, 100, "2024-01-01")],
+      {
+        actions: [
+          {
+            id: "bonus",
+            kind: "bonus",
+            exDate: "2024-03-01",
+            ratioFrom: 2,
+            ratioTo: 1,
+          },
+        ],
+        asOf: "2024-12-31",
+      },
+    )
+    if (!result.ok) throw new Error(result.message)
+    // 1 for every 2 held: 5 shares earn 2 (the half share is paid in cash).
+    expect(result.position.quantity).toBe(7)
+    expect(result.position.invested).toBeCloseTo(500)
+    expect(result.position.lots.at(-1)).toMatchObject({
+      date: "2024-03-01",
+      quantity: 2,
+      costPerShare: 0,
+    })
+  })
+
+  it("lets a sell use bonus shares, and ignores actions not yet due", () => {
+    const bonus = {
+      id: "bonus",
+      kind: "bonus" as const,
+      exDate: "2024-03-01",
+      ratioFrom: 1,
+      ratioTo: 1,
+    }
+    const sellAfterBonus = buildPosition(
+      [txn("buy", 10, 100, "2024-01-01"), txn("sell", 15, 60, "2024-04-01")],
+      { actions: [bonus] },
+    )
+    expect(sellAfterBonus.ok).toBe(true)
+
+    const notYet = buildPosition([txn("buy", 10, 100, "2024-01-01")], {
+      actions: [bonus],
+      asOf: "2024-02-01",
+    })
+    expect(notYet.ok && notYet.position.quantity).toBe(10)
+  })
+
   it("records each sell with the cost of the shares it used", () => {
     const result = position([
       txn("buy", 10, 100, "2024-01-01", { charges: 10 }),

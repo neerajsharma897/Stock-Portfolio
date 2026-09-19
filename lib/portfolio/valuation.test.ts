@@ -25,6 +25,7 @@ function holding(
       lots: [],
       sales: [],
     },
+    flows: [],
   }
 }
 

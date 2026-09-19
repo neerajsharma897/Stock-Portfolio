@@ -7,6 +7,7 @@ import {
   isRelevantNews,
   newsSearchName,
 } from "@/lib/news/relevance"
+import { readAllRows } from "@/lib/supabase/read-all"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
 /** Opening the News page searches again for stocks checked longer ago than this. */
@@ -17,8 +18,11 @@ const FETCH_TIMEOUT_MS = 15_000
 const CONCURRENCY = 4
 // No new searches after this, so a run fits within a 60-second function.
 const TIME_BUDGET_MS = 40_000
-const KEEP_DAYS = 30
-const MAX_ARTICLES_PER_STOCK = 15
+// Only headline, link, source and date are stored, and only this long, so the
+// news tables stay well under 1 MB on Supabase's free tier.
+const KEEP_DAYS = 14
+const MAX_ARTICLES_PER_STOCK = 10
+const DELETE_CHUNK = 200
 const DAY_MS = 86_400_000
 
 export type NewsRefreshSummary = {
@@ -124,7 +128,7 @@ async function searchStock(
 
 /**
  * Searches Google News for stocks not checked in the last `maxAgeMinutes`
- * (oldest check first), then deletes headlines older than 30 days. Pass the
+ * (oldest check first), then prunes stored headlines (see pruneNews). Pass the
  * owner's client (after requireOwner()) or the admin client in the news job.
  */
 export async function refreshNews(
@@ -135,7 +139,8 @@ export async function refreshNews(
   }: { maxAgeMinutes: number; instrumentIds?: readonly number[] },
 ): Promise<NewsRefreshSummary> {
   const started = Date.now()
-  const stocks = (await loadNewsStocks(supabase)).filter(
+  const followed = await loadNewsStocks(supabase)
+  const stocks = followed.filter(
     (stock) => !instrumentIds || instrumentIds.includes(stock.id),
   )
   const queue = stocks
@@ -167,11 +172,73 @@ export async function refreshNews(
   await Promise.all(Array.from({ length: CONCURRENCY }, worker))
   summary.postponed = due - summary.searched
 
-  const { error } = await supabase
-    .from("news_articles")
-    .delete()
-    .lt("published_at", new Date(started - KEEP_DAYS * DAY_MS).toISOString())
-  if (error) throw new Error(`Couldn't delete old headlines: ${error.message}`)
-
+  await pruneNews(
+    supabase,
+    followed.map((stock) => stock.id),
+    started,
+  )
   return summary
+}
+
+/**
+ * Keeps the news tables small: deletes headlines older than two weeks, links to
+ * stocks nobody holds or watches any more (and their news checks, unless a
+ * search name was set), then headlines no stock links to.
+ */
+async function pruneNews(
+  supabase: AppSupabaseClient,
+  followedIds: readonly number[],
+  now: number,
+) {
+  const followedList = `(${followedIds.join(",")})`
+  const [old, links, feeds] = await Promise.all([
+    supabase
+      .from("news_articles")
+      .delete()
+      .lt("published_at", new Date(now - KEEP_DAYS * DAY_MS).toISOString()),
+    followedIds.length > 0
+      ? supabase
+          .from("news_article_stocks")
+          .delete()
+          .not("instrument_id", "in", followedList)
+      : supabase.from("news_article_stocks").delete().gt("instrument_id", 0),
+    followedIds.length > 0
+      ? supabase
+          .from("news_feeds")
+          .delete()
+          .is("search_name", null)
+          .not("instrument_id", "in", followedList)
+      : supabase.from("news_feeds").delete().is("search_name", null),
+  ])
+  const error = old.error ?? links.error ?? feeds.error
+  if (error) throw new Error(`Couldn't tidy stored news: ${error.message}`)
+
+  const [articles, linked] = await Promise.all([
+    readAllRows("headlines", (from, to) =>
+      supabase.from("news_articles").select("id").order("id").range(from, to),
+    ),
+    readAllRows("headline links", (from, to) =>
+      supabase
+        .from("news_article_stocks")
+        .select("article_id")
+        .order("article_id")
+        .order("instrument_id")
+        .range(from, to),
+    ),
+  ])
+  const linkedIds = new Set(linked.map((link) => link.article_id))
+  const orphans = articles
+    .map((article) => article.id)
+    .filter((id) => !linkedIds.has(id))
+  for (let start = 0; start < orphans.length; start += DELETE_CHUNK) {
+    const { error: orphanError } = await supabase
+      .from("news_articles")
+      .delete()
+      .in("id", orphans.slice(start, start + DELETE_CHUNK))
+    if (orphanError) {
+      throw new Error(
+        `Couldn't delete unused headlines: ${orphanError.message}`,
+      )
+    }
+  }
 }

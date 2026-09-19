@@ -8,12 +8,19 @@ import {
   type CryptoProblem,
   type ValuedCrypto,
 } from "@/lib/crypto/portfolio"
+import { fetchCorporateActions } from "@/lib/data/corporate-actions"
 import {
   fetchCryptoTransactions,
   toCoinPrice,
   toCryptoHoldingTransaction,
   type Coin,
 } from "@/lib/data/crypto"
+import {
+  fetchOtherAssets,
+  type Deposit,
+  type IpoApplication,
+  type OtherAsset,
+} from "@/lib/data/other-assets"
 import {
   fetchFundTransactions,
   toFundHoldingTransaction,
@@ -33,6 +40,12 @@ import {
   type FundProblem,
   type ValuedFund,
 } from "@/lib/mutual-funds/portfolio"
+import { todayInIndia } from "@/lib/dates"
+import {
+  depositForTotals,
+  otherAssetForTotals,
+} from "@/lib/other-assets/portfolio"
+import { overallReturn } from "@/lib/portfolio/overall-return"
 import {
   groupHoldings,
   type HoldingProblem,
@@ -45,6 +58,7 @@ import {
   type Mover,
   type PortfolioSummary,
   type PriceItem,
+  type SummaryInput,
   type ValuedHolding,
 } from "@/lib/portfolio/valuation"
 import type { Tables } from "@/lib/supabase/database.types"
@@ -60,18 +74,34 @@ export type MemberPortfolio = {
   fundProblems: FundProblem[]
   crypto: ValuedCrypto[]
   cryptoProblems: CryptoProblem[]
-  /** Stocks, mutual funds and crypto together. */
+  deposits: Deposit[]
+  otherAssets: OtherAsset[]
+  /** Not counted in totals. */
+  ipos: IpoApplication[]
+  /** Stocks, mutual funds, crypto, FDs and other assets together. */
   summary: PortfolioSummary
+  /** Yearly return of stocks, funds, crypto and FDs; null under a year or with unpriced holdings. */
+  xirr: number | null
   fundSummary: PortfolioSummary
   fundXirr: number | null
   /** "Today" is the last 24 hours. */
   cryptoSummary: PortfolioSummary
 }
 
+export type AssetClass = {
+  key: "stocks" | "funds" | "crypto" | "deposits" | "other"
+  label: string
+  /** Page listing this asset type across the family, if there is one. */
+  href: string | null
+  summary: PortfolioSummary
+}
+
 export type FamilyPortfolio = {
   members: MemberPortfolio[]
-  /** Stocks, mutual funds and crypto together. "Today" covers stocks only. */
+  /** Everything together. "Today" covers stocks only. */
   summary: PortfolioSummary
+  xirr: number | null
+  assetClasses: AssetClass[]
   fundSummary: PortfolioSummary
   fundXirr: number | null
   cryptoSummary: PortfolioSummary
@@ -82,7 +112,7 @@ export type FamilyPortfolio = {
   movers: { gainers: Mover[]; losers: Mover[] }
 }
 
-/** Every active (not archived) member's stocks, funds and coins, valued with saved prices and NAVs. */
+/** Every active (not archived) member's investments, valued with saved prices, NAVs and today's FD interest. */
 export async function getFamilyPortfolio(): Promise<FamilyPortfolio> {
   await requireOwner()
   return buildFamilyPortfolio(await createClient())
@@ -102,7 +132,8 @@ export async function buildFamilyPortfolio(
   }
 
   const memberIds = members.map((member) => member.id)
-  const [transactions, fundTransactions, cryptoTransactions] =
+  const today = todayInIndia()
+  const [transactions, fundTransactions, cryptoTransactions, others] =
     await Promise.all([
       memberIds.length === 0
         ? []
@@ -118,6 +149,7 @@ export async function buildFamilyPortfolio(
           ),
       fetchFundTransactions(supabase, memberIds),
       fetchCryptoTransactions(supabase, memberIds),
+      fetchOtherAssets(supabase, memberIds, today),
     ])
 
   const instruments = new Map<number, TransactionInstrument>(
@@ -138,13 +170,17 @@ export async function buildFamilyPortfolio(
       transaction.coin,
     ]),
   )
-  const prices = await fetchPrices(supabase, instruments.keys())
+  const [prices, corporateActions] = await Promise.all([
+    fetchPrices(supabase, instruments.keys()),
+    fetchCorporateActions(supabase, instruments.keys()),
+  ])
 
   const memberPortfolios = members.map((member) => {
     const { holdings, problems } = groupHoldings(
       transactions
         .filter((transaction) => transaction.member_id === member.id)
         .map(toHoldingTransaction),
+      corporateActions,
     )
     const valued = holdings.map((holding) =>
       valueHolding(holding, prices.get(holding.instrumentId) ?? null),
@@ -170,6 +206,13 @@ export async function buildFamilyPortfolio(
       valueCrypto(holding, toCoinPrice(coins.get(holding.market))),
     )
 
+    const deposits = others.deposits.filter(
+      (deposit) => deposit.memberId === member.id,
+    )
+    const otherAssets = others.otherAssets.filter(
+      (asset) => asset.memberId === member.id,
+    )
+
     return {
       member,
       holdings: valued,
@@ -178,11 +221,17 @@ export async function buildFamilyPortfolio(
       fundProblems,
       crypto,
       cryptoProblems,
+      deposits,
+      otherAssets,
+      ipos: others.ipos.filter((ipo) => ipo.member_id === member.id),
       summary: summarize([
         ...valued,
         ...forFamilyTotals(funds),
         ...cryptoForFamilyTotals(crypto),
+        ...deposits.map((deposit) => depositForTotals(deposit, today)),
+        ...otherAssets.map(otherAssetForTotals),
       ]),
+      xirr: overallReturn({ holdings: valued, funds, crypto, deposits }, today),
       fundSummary: summarize(funds),
       fundXirr: combinedReturn(funds),
       cryptoSummary: summarize(crypto),
@@ -194,13 +243,40 @@ export async function buildFamilyPortfolio(
   )
   const allFunds = memberPortfolios.flatMap((portfolio) => portfolio.funds)
   const allCrypto = memberPortfolios.flatMap((portfolio) => portfolio.crypto)
+  const classInputs: Record<AssetClass["key"], SummaryInput[]> = {
+    stocks: allHoldings,
+    funds: forFamilyTotals(allFunds),
+    crypto: cryptoForFamilyTotals(allCrypto),
+    deposits: memberPortfolios.flatMap((portfolio) =>
+      portfolio.deposits.map((deposit) => depositForTotals(deposit, today)),
+    ),
+    other: memberPortfolios.flatMap((portfolio) =>
+      portfolio.otherAssets.map(otherAssetForTotals),
+    ),
+  }
+  const classes: Omit<AssetClass, "summary">[] = [
+    { key: "stocks", label: "Stocks", href: null },
+    { key: "funds", label: "Mutual funds", href: "/mutual-funds" },
+    { key: "crypto", label: "Crypto", href: "/crypto" },
+    { key: "deposits", label: "Fixed deposits", href: "/other-assets" },
+    { key: "other", label: "Gold, PPF & other", href: "/other-assets" },
+  ]
   return {
     members: memberPortfolios,
-    summary: summarize([
-      ...allHoldings,
-      ...forFamilyTotals(allFunds),
-      ...cryptoForFamilyTotals(allCrypto),
-    ]),
+    summary: summarize(Object.values(classInputs).flat()),
+    xirr: overallReturn(
+      {
+        holdings: allHoldings,
+        funds: allFunds,
+        crypto: allCrypto,
+        deposits: memberPortfolios.flatMap((portfolio) => portfolio.deposits),
+      },
+      today,
+    ),
+    assetClasses: classes.map((assetClass) => ({
+      ...assetClass,
+      summary: summarize(classInputs[assetClass.key]),
+    })),
     fundSummary: summarize(allFunds),
     fundXirr: combinedReturn(allFunds),
     cryptoSummary: summarize(allCrypto),

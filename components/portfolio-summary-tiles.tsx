@@ -4,8 +4,11 @@ import type { PortfolioSummary } from "@/lib/portfolio/valuation"
 
 export function PortfolioSummaryTiles({
   summary,
+  xirr,
 }: {
   summary: PortfolioSummary
+  /** Yearly return; pass null while it can't be worked out. */
+  xirr?: number | null
 }) {
   const priced = summary.pricedCount > 0
   const unpriced = summary.holdingCount - summary.pricedCount
@@ -45,6 +48,13 @@ export function PortfolioSummaryTiles({
             : undefined
         }
         tone={toneOf(summary.unrealizedPnl)}
+        hint={
+          xirr === undefined
+            ? undefined
+            : xirr !== null
+              ? `${formatPercent(xirr * 100)} a year (XIRR)`
+              : "XIRR shows once money has been invested for a year and everything has a price"
+        }
       />
       <StatTile
         label="Booked from sells"

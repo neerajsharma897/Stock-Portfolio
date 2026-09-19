@@ -102,9 +102,34 @@ first investment date for opening balances to get a meaningful figure.
 - **News** is searched when the News page opens (for stocks not checked in the last 30 minutes) and every morning once
   deployed. Headlines must name the stock, so a bare ticker can miss news or pick up namesakes (RELIANCE also matches
   Reliance Power). Pick the stock on the News page → **Change search** → enter the company name, e.g. "Reliance Industries".
-  Headlines older than 30 days are deleted.
+  Only the headline, link, source and date are stored, 10 per stock at most, and deleted after 14 days or once no one holds or watches the stock (well under 1 MB).
 
 
+
+## Extras (Stage 12)
+
+1. Run `supabase/migrations/20260919120000_corporate_actions_other_assets.sql`, then
+   `supabase/migrations/20260919150000_mfa_audit_log.sql`, in the Supabase SQL Editor. Until both have run, the dashboard
+   and member pages show "a database migration may not have been run yet".
+2. **Splits & bonuses** (Settings): when a stock the family holds splits or issues bonus shares, add it with the ex-date.
+   Every holding of that stock gets the new share count and average price. NSE and BSE listings are separate.
+3. **FDs, other assets and IPOs**: open a member → Fixed deposits / Other assets / IPO applications. FDs grow with
+   interest to today; other assets use the value you last entered, so update PPF or gold now and then. **FDs & other
+   assets** lists them for the whole family. IPO applications aren't counted in totals; once allotted shares list, add
+   them as a stock buy.
+4. **Tax reports**: capital gains per member and financial year, split into short- and long-term, with an estimate of
+   the tax. **Download Excel** there (or in Settings → Backup & restore) gets holdings, the year's gains and every entry
+   as a spreadsheet.
+5. **Two-step sign-in** (Settings): scan the QR code with an authenticator app (Google Authenticator or similar) and
+   enter a code. After that, signing in asks for a code from the app, and the database refuses a session without it.
+   TOTP is on by default in Supabase (Authentication → Multi-Factor); turn it on there if setup fails. Keep the phone
+   with the app safe: without it, the factor has to be removed in Supabase → Authentication → Users.
+6. **Install on the phone**: open the site in Chrome (Android) or Safari (iPhone) → menu → **Add to Home screen** /
+   **Install app**. It opens full screen with its own icon.
+7. **Recent changes** (Settings) lists the last 30 additions, edits and deletions; the log keeps a year.
+
+XIRR now shows per stock and coin, and on the summary tiles for each member and the family once money has been invested
+for a year and every holding has a price.
 
 ## Deploying to Vercel (Stage 7)
 
@@ -138,7 +163,7 @@ Defined in `vercel.json`. Times are UTC; on Vercel's free plan each job runs onc
 | Daily snapshot | Mon–Fri, 11:00 UTC (4:30–5:30 PM India) | Fetches closing prices from Angel One if set up and crypto prices from CoinDCX, then saves each stock's close and each member's portfolio value for the day. Skips weekends and listed holidays. |
 | Mutual fund NAVs | Mon–Fri, 18:00 UTC (11:30 PM–12:30 AM India) | Downloads AMFI's NAV file: new funds, latest NAVs, and closed funds marked inactive. |
 | Stock list update | Mondays, 02:00 UTC (7:30–8:30 AM India) | Refreshes the stock list from Angel One's instrument file. |
-| Stock news | Every day, 01:00 UTC (6:30–7:30 AM India) | Searches Google News for held and watchlisted stocks and deletes headlines older than 30 days. |
+| Stock news | Every day, 01:00 UTC (6:30–7:30 AM India) | Searches Google News for held and watchlisted stocks and deletes headlines older than 14 days or for stocks no longer followed. |
 | Crypto coin list | Mondays, 03:00 UTC (8:30–9:30 AM India) | Refreshes CoinDCX's rupee coins with prices; coins no longer traded for rupees are marked inactive. |
 
 Vercel may occasionally skip or repeat a run; every job is safe to run again.
@@ -167,7 +192,8 @@ repository's **Actions** tab). It downloads the same export from the live site, 
 .zip, so unzip it first) → enter the passphrase if it's encrypted → **Check file** shows what's inside → **Replace all data**.
 Restoring replaces everything with the file's contents in one database transaction: if anything fails, nothing changes.
 Download the stock, fund and coin lists first, since stocks are matched by exchange and code, funds by AMFI code and coins
-by CoinDCX market (e.g. BTCINR). Backups made before Stages 8 and 10 still restore.
+by CoinDCX market (e.g. BTCINR). Backups made before Stages 8, 10 and 12 still restore. Backups also carry FDs, other
+assets, IPO applications, splits and bonuses, and named watchlists. A restore shows as one entry in Recent changes.
 
 ## Scripts
 
@@ -185,7 +211,9 @@ by CoinDCX market (e.g. BTCINR). Backups made before Stages 8 and 10 still resto
 ```
 app/
   (auth)/login/        Sign-in page + auth Server Actions
-  (app)/               Signed-in pages: dashboard, members, mutual-funds, crypto, watchlist, news, alerts, settings
+  (app)/               Signed-in pages: dashboard, members, mutual-funds, crypto, other-assets, watchlist, news,
+                       reports, alerts, settings
+  (auth)/verify/       Two-step sign-in code
 components/
   layout/              App shell, navigation, account menu
   ui/                  shadcn/ui components

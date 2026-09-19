@@ -1,18 +1,25 @@
 import { z } from "zod"
 
+import { CORPORATE_ACTION_KINDS } from "@/lib/corporate-actions/schema"
 import { BROKERS, MEMBER_RELATIONS } from "@/lib/members/options"
 import { MF_TRANSACTION_TYPES } from "@/lib/mutual-funds/options"
+import {
+  FD_INTERESTS,
+  IPO_STATUSES,
+  OTHER_ASSET_KINDS,
+} from "@/lib/other-assets/options"
 import { TRANSACTION_TYPES } from "@/lib/transactions/options"
 
 // Backup file format. Rows use the database column names; stocks are referenced
 // by exchange and Angel One token (plus symbol, for reading) because instrument
 // ids differ between databases. Mutual funds use the AMFI code, which doesn't.
 // Version 2 adds mutual fund entries; version 3 adds crypto entries (by CoinDCX
-// market), the watchlist and news search names; version 4 adds named watchlists.
+// market), the watchlist and news search names; version 4 adds named watchlists;
+// version 5 adds splits and bonuses, FDs, other assets and IPO applications.
 // Older files still restore (a version 3 watchlist becomes "Watchlist 1").
 
 export const BACKUP_APP = "family-portfolio"
-export const BACKUP_VERSION = 4
+export const BACKUP_VERSION = 5
 
 const timestamp = z.string().min(1)
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -29,6 +36,7 @@ export const backupSchema = z.object({
     z.literal(1),
     z.literal(2),
     z.literal(3),
+    z.literal(4),
     z.literal(BACKUP_VERSION),
   ]),
   exportedAt: timestamp,
@@ -136,6 +144,72 @@ export const backupSchema = z.object({
   newsSearches: z
     .array(z.object({ ...stockRef, search_name: z.string().min(1) }))
     .default([]),
+  corporateActions: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        ...stockRef,
+        kind: z.enum(CORPORATE_ACTION_KINDS),
+        ex_date: isoDate,
+        ratio_from: z.number().int().positive(),
+        ratio_to: z.number().int().positive(),
+        notes: nullableText,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .default([]),
+  fixedDeposits: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        member_id: z.uuid(),
+        bank: z.string().min(1),
+        principal: z.number().positive(),
+        rate_pct: z.number().positive(),
+        interest: z.enum(FD_INTERESTS),
+        start_date: isoDate,
+        maturity_date: isoDate,
+        closed_on: isoDate.nullable(),
+        notes: nullableText,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .default([]),
+  otherAssets: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        member_id: z.uuid(),
+        kind: z.enum(OTHER_ASSET_KINDS),
+        name: z.string().min(1),
+        invested: z.number().nonnegative(),
+        current_value: z.number().nonnegative(),
+        value_as_of: isoDate,
+        notes: nullableText,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .default([]),
+  ipoApplications: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        member_id: z.uuid(),
+        company: z.string().min(1),
+        applied_on: isoDate,
+        shares_applied: z.number().int().positive(),
+        price: z.number().positive(),
+        status: z.enum(IPO_STATUSES),
+        shares_allotted: z.number().int().nonnegative().nullable(),
+        notes: nullableText,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .default([]),
   instrumentPrices: z.array(
     z.object({
       ...stockRef,
@@ -186,6 +260,10 @@ export type BackupCounts = {
   cryptoEntries: number
   watchlists: number
   watchlist: number
+  deposits: number
+  otherAssets: number
+  ipos: number
+  corporateActions: number
   prices: number
   holidays: number
   closingPrices: number
@@ -201,6 +279,10 @@ export function countBackup(backup: Backup): BackupCounts {
     cryptoEntries: backup.cryptoTransactions.length,
     watchlists: backup.watchlists.length,
     watchlist: backup.watchlist.length,
+    deposits: backup.fixedDeposits.length,
+    otherAssets: backup.otherAssets.length,
+    ipos: backup.ipoApplications.length,
+    corporateActions: backup.corporateActions.length,
     prices: backup.instrumentPrices.length,
     holidays: backup.marketHolidays.length,
     closingPrices: backup.eodPrices.length,
@@ -222,6 +304,7 @@ export function stockRefs(
     ...backup.eodPrices,
     ...backup.watchlist,
     ...backup.newsSearches,
+    ...backup.corporateActions,
   ]) {
     refs.set(`${row.exchange}:${row.token}`, {
       exchange: row.exchange,

@@ -11,6 +11,8 @@ import type { Price } from "@/lib/portfolio/valuation"
 import { fetchAndSavePrices } from "@/lib/prices/save"
 import type { AppSupabaseClient } from "@/lib/supabase/types"
 
+const AUDIT_KEEP_DAYS = 366
+
 /**
  * After the market closes: fetch closing prices (when Angel One is set up) and
  * crypto prices, then save each stock's close and each member's portfolio for the day.
@@ -108,6 +110,18 @@ export async function runDailySnapshot(
     `${snapshotRows.length} member snapshots`,
     `${eodRows.length} closing prices saved`,
   )
+
+  // The audit log keeps a year of changes.
+  const { error: auditError } = await supabase
+    .from("audit_log")
+    .delete()
+    .lt(
+      "changed_at",
+      new Date(Date.now() - AUDIT_KEEP_DAYS * 86_400_000).toISOString(),
+    )
+  if (auditError) {
+    notes.push(`old audit entries weren't deleted (${auditError.message})`)
+  }
   return {
     status: priceErrors.length > 0 ? "failed" : "success",
     summary: notes.join(" · "),

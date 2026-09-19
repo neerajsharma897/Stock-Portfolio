@@ -116,7 +116,7 @@ export function CryptoCard({
               : `Add an opening balance for each coin ${memberName} already holds, using the quantity and average buy price from CoinDCX.`}
           </p>
         ) : (
-          <div className="-mx-4 overflow-x-auto">
+          <div className="relative -mx-4 overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
@@ -200,6 +200,11 @@ export function CryptoCard({
                             {holding.unrealizedPct !== null && (
                               <div className={cn("text-xs", pnlTone)}>
                                 {formatPercent(holding.unrealizedPct)}
+                              </div>
+                            )}
+                            {holding.xirr !== null && (
+                              <div className="text-xs text-muted-foreground">
+                                {formatPercent(holding.xirr * 100)} XIRR
                               </div>
                             )}
                           </>

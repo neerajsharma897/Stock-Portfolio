@@ -1,6 +1,6 @@
 "use client"
 
-import { DownloadIcon, FileCheckIcon } from "lucide-react"
+import { DownloadIcon, FileCheckIcon, FileSpreadsheetIcon } from "lucide-react"
 import { useRef, useState, useTransition } from "react"
 
 import {
@@ -26,6 +26,10 @@ const COUNT_LABELS: [keyof BackupCounts, string][] = [
   ["cryptoEntries", "Crypto entries"],
   ["watchlists", "Watchlists"],
   ["watchlist", "Watchlist stocks"],
+  ["deposits", "Fixed deposits"],
+  ["otherAssets", "Other assets"],
+  ["ipos", "IPO applications"],
+  ["corporateActions", "Splits & bonuses"],
   ["prices", "Saved prices"],
   ["holidays", "Market holidays"],
   ["closingPrices", "Daily closing prices"],
@@ -80,17 +84,30 @@ export function BackupCard() {
             Download your data
           </h3>
           <p className="text-sm text-muted-foreground">
-            Members, accounts, stock, mutual fund and crypto entries, the
-            watchlist, prices, holidays and daily history in one file. Keep it
-            somewhere safe; it isn&apos;t encrypted.
+            Members, accounts, stock, mutual fund and crypto entries, FDs, other
+            assets, watchlists, prices, holidays and daily history in one file.
+            Keep it somewhere safe; it isn&apos;t encrypted.
           </p>
         </div>
-        <Button asChild variant="outline" className="w-fit">
-          <a href="/api/export" download>
-            <DownloadIcon />
-            Download data
-          </a>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="w-fit">
+            <a href="/api/export" download>
+              <DownloadIcon />
+              Download data
+            </a>
+          </Button>
+          <Button asChild variant="outline" className="w-fit">
+            <a href="/api/export/excel" download>
+              <FileSpreadsheetIcon />
+              Download Excel
+            </a>
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          &ldquo;Download data&rdquo; is the file to restore from.
+          &ldquo;Download Excel&rdquo; is for reading: holdings, this
+          year&apos;s capital gains and every entry, one sheet each.
+        </p>
       </section>
 
       <Separator />

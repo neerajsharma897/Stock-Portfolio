@@ -1,8 +1,11 @@
 import {
   buildPosition,
+  type CorporateAction,
   type Position,
   type PositionTransaction,
 } from "@/lib/portfolio/holdings"
+import { cashFlowsOf } from "@/lib/portfolio/returns"
+import type { CashFlow } from "@/lib/portfolio/xirr"
 
 export type TransactionForHolding = PositionTransaction & {
   brokerAccountId: string
@@ -13,6 +16,8 @@ export type Holding = {
   brokerAccountId: string
   instrumentId: number
   position: Position
+  /** Money put in (negative) and taken out (positive), one per entry. */
+  flows: CashFlow[]
 }
 
 /** A position whose saved entries don't add up, e.g. a sell larger than the shares held. */
@@ -23,8 +28,17 @@ export type HoldingProblem = {
   message: string
 }
 
-/** Groups a member's transactions into one position per broker account and stock. */
-export function groupHoldings(transactions: readonly TransactionForHolding[]): {
+/**
+ * Groups a member's transactions into one position per broker account and
+ * stock, applying each stock's splits and bonuses.
+ */
+export function groupHoldings(
+  transactions: readonly TransactionForHolding[],
+  actionsByInstrument: ReadonlyMap<
+    number,
+    readonly CorporateAction[]
+  > = new Map(),
+): {
   holdings: Holding[]
   problems: HoldingProblem[]
 } {
@@ -40,12 +54,15 @@ export function groupHoldings(transactions: readonly TransactionForHolding[]): {
   const problems: HoldingProblem[] = []
   for (const group of groups.values()) {
     const { brokerAccountId, instrumentId } = group[0]
-    const result = buildPosition(group)
+    const result = buildPosition(group, {
+      actions: actionsByInstrument.get(instrumentId),
+    })
     if (result.ok) {
       holdings.push({
         brokerAccountId,
         instrumentId,
         position: result.position,
+        flows: cashFlowsOf(group),
       })
     } else {
       problems.push({
